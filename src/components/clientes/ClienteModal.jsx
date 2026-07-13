@@ -1,13 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import {
-  getClienteById,
-  getDiagnosticoByClienteId,
-  createCliente,
-  updateCliente,
-  createDiagnostico,
-  updateDiagnostico,
-} from '../../services'
+import { useConfirm } from '../../context/ConfirmContext'
+import { getClienteById, getDiagnosticoByClienteId, guardarClienteCompleto } from '../../services'
 import { GROSOR_CABELLO, SI_NO } from '../../data/constants'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -26,28 +20,36 @@ const FORM_VACIO = {
 
 export default function ClienteModal() {
   const { clienteModal, closeClienteModal, refresh } = useApp()
+  const confirmar = useConfirm()
   const { open, clienteId } = clienteModal
   const esEdicion = Boolean(clienteId)
 
   const [form, setForm] = useState(FORM_VACIO)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [errors, setErrors] = useState({})
+  const [retryTick, setRetryTick] = useState(0)
+  // Snapshot del formulario recién cargado, para detectar cambios sin guardar.
+  const inicialRef = useRef(null)
 
   // Al abrir: si es edición, precargar cliente + diagnóstico; si es alta, limpiar.
   useEffect(() => {
     if (!open) return
     setErrors({})
+    setLoadError(null)
     if (!esEdicion) {
       setForm(FORM_VACIO)
+      inicialRef.current = JSON.stringify(FORM_VACIO)
       return
     }
     let vivo = true
     setLoading(true)
-    Promise.all([getClienteById(clienteId), getDiagnosticoByClienteId(clienteId)]).then(
-      ([c, d]) => {
+    Promise.all([getClienteById(clienteId), getDiagnosticoByClienteId(clienteId)])
+      .then(([c, d]) => {
         if (!vivo) return
-        setForm({
+        const datos = {
           nombreCompleto: c?.nombreCompleto ?? '',
           telefono: c?.telefono ?? '',
           fechaCumpleanos: c?.fechaCumpleanos ?? '',
@@ -55,22 +57,46 @@ export default function ClienteModal() {
           alisadoOKeratinaPrevia: d?.alisadoOKeratinaPrevia ?? 'No',
           fechaAlisadoOKeratina: d?.fechaAlisadoOKeratina ?? '',
           grosorCabello: d?.grosorCabello ?? 'Medio',
-        })
+        }
+        setForm(datos)
+        inicialRef.current = JSON.stringify(datos)
         setLoading(false)
-      }
-    )
+      })
+      .catch((err) => {
+        if (!vivo) return
+        console.error('Error cargando cliente/diagnóstico:', err)
+        setLoadError('No se pudieron cargar los datos del cliente.')
+        setLoading(false)
+      })
     return () => {
       vivo = false
     }
-  }, [open, clienteId, esEdicion])
+  }, [open, clienteId, esEdicion, retryTick])
 
   if (!open) return null
 
   const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
 
+  // Cierra pidiendo confirmación si hay cambios sin guardar.
+  const cerrarConGuardia = async () => {
+    const sucio = inicialRef.current !== null && JSON.stringify(form) !== inicialRef.current
+    if (sucio && !(await confirmar('Hay cambios sin guardar. ¿Descartar los cambios?'))) return
+    closeClienteModal()
+  }
+
   const validar = () => {
     const e = {}
     if (!form.nombreCompleto.trim()) e.nombreCompleto = 'El nombre es obligatorio.'
+
+    const tel = form.telefono.trim()
+    if (tel) {
+      if (!/^[\d\s()+-]+$/.test(tel)) {
+        e.telefono = 'Solo números, espacios y + - ( ).'
+      } else if (tel.replace(/\D/g, '').length < 7) {
+        e.telefono = 'Parece incompleto.'
+      }
+    }
+
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -78,6 +104,7 @@ export default function ClienteModal() {
   const handleGuardar = async () => {
     if (!validar()) return
     setSaving(true)
+    setSaveError(null)
 
     // Si "alisado/keratina previa" es No, no guardamos la fecha.
     const fechaAlisado =
@@ -95,32 +122,25 @@ export default function ClienteModal() {
       grosorCabello: form.grosorCabello,
     }
 
-    if (esEdicion) {
-      await updateCliente(clienteId, datosCliente)
-      // Si el cliente no tenía diagnóstico, lo creamos; si tenía, lo actualizamos.
-      const diagExistente = await getDiagnosticoByClienteId(clienteId)
-      if (diagExistente) {
-        await updateDiagnostico(clienteId, datosDiagnostico)
-      } else {
-        await createDiagnostico(clienteId, datosDiagnostico)
-      }
-    } else {
-      const nuevo = await createCliente(datosCliente)
-      await createDiagnostico(nuevo.id, datosDiagnostico)
+    try {
+      await guardarClienteCompleto(esEdicion ? clienteId : null, datosCliente, datosDiagnostico)
+      refresh()
+      closeClienteModal()
+    } catch (err) {
+      console.error('Error guardando cliente:', err)
+      setSaveError('No se pudo guardar. Revisá tu conexión e intentá de nuevo.')
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
-    refresh()
-    closeClienteModal()
   }
 
   return (
     <Modal
       title={esEdicion ? 'Editar cliente' : 'Nuevo cliente'}
-      onClose={closeClienteModal}
+      onClose={cerrarConGuardia}
       footer={
         <>
-          <Button variant="ghost" onClick={closeClienteModal} disabled={saving}>
+          <Button variant="ghost" onClick={cerrarConGuardia} disabled={saving}>
             Cancelar
           </Button>
           <Button variant="primary" onClick={handleGuardar} disabled={saving || loading}>
@@ -131,8 +151,18 @@ export default function ClienteModal() {
     >
       {loading ? (
         <div className="loading">Cargando…</div>
+      ) : loadError ? (
+        <div className="page-error">
+          <div className="page-error__emoji">⚠️</div>
+          <p>{loadError}</p>
+          <Button variant="ghost" onClick={() => setRetryTick((t) => t + 1)}>
+            Reintentar
+          </Button>
+        </div>
       ) : (
         <>
+          {saveError && <div className="form-error">{saveError}</div>}
+
           {/* Sección 1: datos del cliente */}
           <div className="card card--accent">
             <div className="form-section-label">Datos del cliente</div>
@@ -152,10 +182,12 @@ export default function ClienteModal() {
             </Field>
 
             <div className="form-row">
-              <Field label="Teléfono" htmlFor="f-tel">
+              <Field label="Teléfono" htmlFor="f-tel" error={errors.telefono}>
                 <TextInput
                   id="f-tel"
+                  type="tel"
                   value={form.telefono}
+                  error={errors.telefono}
                   onChange={(e) => set('telefono', e.target.value)}
                 />
               </Field>

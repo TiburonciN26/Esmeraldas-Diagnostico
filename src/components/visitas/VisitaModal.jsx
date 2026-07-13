@@ -1,19 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext'
-import {
-  getVisitaById,
-  getUltimaVisita,
-  createVisita,
-  updateVisita,
-  visitaVacia,
-} from '../../services'
-import {
-  TIPOS_APLICACION,
-  TIPOS_CON_DECOLORACION,
-  TIPO_SOLO_RAIZ,
-  PORCENTAJE_CANAS,
-} from '../../data/constants'
+import { useSession } from '../../context/SessionContext'
+import { useConfirm } from '../../context/ConfirmContext'
+import { createVisita, updateVisita, visitaVacia } from '../../services'
+import { TIPOS_APLICACION, PORCENTAJE_CANAS } from '../../data/constants'
 import { hoyISO } from '../../utils/date'
+import { calcularVisibilidad } from '../../utils/visitaLogic'
+import { comprimirImagen } from '../../utils/image'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import { Field, TextInput, TextArea, Select } from '../ui/Field'
@@ -36,69 +29,43 @@ const CAMPOS_PRECARGA = [
   'nota',
 ]
 
-// Calcula qué campos condicionales deben mostrarse según el estado actual.
-function calcularVisibilidad(form) {
-  const tieneTexto = (v) => String(v ?? '').trim() !== ''
-  const mostrarMediosBloque = form.tipoAplicacion !== TIPO_SOLO_RAIZ
-  return {
-    // Decoloración: solo para ciertos tipos de aplicación.
-    decoloracion: TIPOS_CON_DECOLORACION.includes(form.tipoAplicacion),
-    // Cascada raíz.
-    oxidanteRaiz: tieneTexto(form.formulaRaiz),
-    tiempoRaiz: tieneTexto(form.formulaRaiz) && tieneTexto(form.oxidanteRaiz),
-    // Bloque medios a puntas (oculto entero para "Retoque de raíz").
-    mediosBloque: mostrarMediosBloque,
-    oxidanteMedios: mostrarMediosBloque && tieneTexto(form.formulaMediosAPuntas),
-    tiempoMedios:
-      mostrarMediosBloque &&
-      tieneTexto(form.formulaMediosAPuntas) &&
-      tieneTexto(form.oxidanteMediosAPuntas),
-  }
-}
-
 export default function VisitaModal() {
   const { visitaModal, closeVisitaModal, refresh } = useApp()
-  const { open, clienteId, visitaId } = visitaModal
+  const { session } = useSession()
+  const esAdmin = session?.rol === 'administrador'
+  const confirmar = useConfirm()
+  const { open, clienteId, visitaId, visita } = visitaModal
   const esEdicion = Boolean(visitaId)
 
   const [form, setForm] = useState({ ...visitaVacia })
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [errors, setErrors] = useState({})
+  const [errorFoto, setErrorFoto] = useState(null)
+  // Snapshot del formulario recién cargado, para detectar cambios sin guardar.
+  const inicialRef = useRef(null)
 
-  // Al abrir, decidir precarga:
-  // - Edición: cargar ESA visita.
+  // Al abrir, decidir precarga con los datos que ya llegaron por contexto
+  // (sin pedirlos al backend):
+  // - Edición: la visita puntual pasada por openEditarVisita.
   // - Alta con historial: copiar la última visita (menos fecha y foto).
   // - Alta sin historial: formulario vacío con la fecha de hoy.
   useEffect(() => {
     if (!open) return
     setErrors({})
-    let vivo = true
-    setLoading(true)
+    setSaveError(null)
+    setErrorFoto(null)
 
-    const preparar = async () => {
-      if (esEdicion) {
-        const v = await getVisitaById(visitaId)
-        return { ...visitaVacia, ...(v || {}) }
-      }
-      const ultima = await getUltimaVisita(clienteId)
-      const base = { ...visitaVacia, fecha: hoyISO() }
-      if (ultima) {
-        for (const campo of CAMPOS_PRECARGA) base[campo] = ultima[campo] ?? ''
-      }
-      return base
+    const datos = esEdicion
+      ? { ...visitaVacia, ...(visita || {}) }
+      : { ...visitaVacia, fecha: hoyISO() }
+    if (!esEdicion && visita) {
+      for (const campo of CAMPOS_PRECARGA) datos[campo] = visita[campo] ?? ''
     }
 
-    preparar().then((datos) => {
-      if (!vivo) return
-      setForm(datos)
-      setLoading(false)
-    })
-
-    return () => {
-      vivo = false
-    }
-  }, [open, clienteId, visitaId, esEdicion])
+    setForm(datos)
+    inicialRef.current = JSON.stringify(datos)
+  }, [open, visitaId, esEdicion, visita])
 
   if (!open) return null
 
@@ -109,18 +76,27 @@ export default function VisitaModal() {
     const e = {}
     if (!form.tipoAplicacion) e.tipoAplicacion = 'Elegí un tipo de aplicación.'
     if (!form.fecha) e.fecha = 'La fecha es obligatoria.'
+    if (form.precio !== '' && Number(form.precio) < 0) {
+      e.precio = 'No puede ser negativo.'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
-  // Lee el archivo elegido y lo guarda como data URL (preview local).
-  // En la Fase 6 esto se reemplaza por compresión + subida a Google Drive.
-  const handleFoto = (e) => {
+  // Comprime la foto elegida (máx. 1280px, JPEG) y la deja como data URL
+  // local. La subida real a Drive ocurre recién al guardar la visita
+  // (visitasService la detecta y la reemplaza por la URL definitiva).
+  const handleFoto = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => set('fotoResultado', reader.result)
-    reader.readAsDataURL(file)
+    setErrorFoto(null)
+    try {
+      const dataUrl = await comprimirImagen(file)
+      set('fotoResultado', dataUrl)
+    } catch (err) {
+      console.error('Error procesando la foto:', err)
+      setErrorFoto('No se pudo procesar esa imagen.')
+    }
   }
 
   // Antes de guardar, limpiamos los campos que están ocultos por la lógica
@@ -144,229 +120,243 @@ export default function VisitaModal() {
   const handleGuardar = async () => {
     if (!validar()) return
     setSaving(true)
+    setSaveError(null)
     const datos = sanitizar()
 
-    if (esEdicion) {
-      // Editar modifica ESA visita (no crea una nueva).
-      await updateVisita(visitaId, datos)
-    } else {
-      // Alta: siempre crea un registro nuevo (la última visita no se toca).
-      await createVisita(clienteId, datos)
-    }
+    try {
+      if (esEdicion) {
+        // Editar modifica ESA visita (no crea una nueva).
+        await updateVisita(visitaId, datos)
+      } else {
+        // Alta: siempre crea un registro nuevo (la última visita no se toca).
+        await createVisita(clienteId, datos)
+      }
 
-    setSaving(false)
-    refresh()
+      refresh()
+      closeVisitaModal()
+    } catch (err) {
+      console.error('Error guardando la visita:', err)
+      setSaveError('No se pudo guardar. Revisá tu conexión e intentá de nuevo.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Cierra pidiendo confirmación si hay cambios sin guardar (evita perder
+  // datos por un Escape o un clic accidental en el fondo).
+  const cerrarConGuardia = async () => {
+    const sucio = inicialRef.current !== null && JSON.stringify(form) !== inicialRef.current
+    if (sucio && !(await confirmar('Hay cambios sin guardar. ¿Descartar esta visita?'))) return
     closeVisitaModal()
   }
 
   return (
     <Modal
       title={esEdicion ? 'Editar visita' : 'Nueva visita'}
-      onClose={closeVisitaModal}
+      onClose={cerrarConGuardia}
       footer={
         <>
-          <Button variant="ghost" onClick={closeVisitaModal} disabled={saving}>
+          <Button variant="ghost" onClick={cerrarConGuardia} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleGuardar} disabled={saving || loading}>
+          <Button variant="primary" onClick={handleGuardar} disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         </>
       }
     >
-      {loading ? (
-        <div className="loading">Cargando…</div>
-      ) : (
-        <>
-          <Field
-            label="Tipo de aplicación"
-            required
-            error={errors.tipoAplicacion}
-            htmlFor="v-tipo"
-          >
-            <Select
-              id="v-tipo"
-              options={TIPOS_APLICACION}
-              placeholder="Elegir…"
-              value={form.tipoAplicacion}
-              error={errors.tipoAplicacion}
-              onChange={(e) => set('tipoAplicacion', e.target.value)}
+      {saveError && <div className="form-error">{saveError}</div>}
+
+      <Field label="Tipo de aplicación" required error={errors.tipoAplicacion} htmlFor="v-tipo">
+        <Select
+          id="v-tipo"
+          options={TIPOS_APLICACION}
+          placeholder="Elegir…"
+          value={form.tipoAplicacion}
+          error={errors.tipoAplicacion}
+          onChange={(e) => set('tipoAplicacion', e.target.value)}
+        />
+      </Field>
+
+      {/* Condicional: decoloración - etapa */}
+      {vis.decoloracion && (
+        <Field label="Decoloración — etapa" htmlFor="v-decol">
+          <div className="field--cond">
+            <TextInput
+              id="v-decol"
+              value={form.decoloracionEtapa}
+              placeholder="Ej. Etapa 2 - fondo naranja"
+              onChange={(e) => set('decoloracionEtapa', e.target.value)}
             />
-          </Field>
+          </div>
+        </Field>
+      )}
 
-          {/* Condicional: decoloración - etapa */}
-          {vis.decoloracion && (
-            <Field label="Decoloración — etapa" htmlFor="v-decol">
-              <div className="field--cond">
-                <TextInput
-                  id="v-decol"
-                  value={form.decoloracionEtapa}
-                  placeholder="Ej. Etapa 2 - fondo naranja"
-                  onChange={(e) => set('decoloracionEtapa', e.target.value)}
-                />
-              </div>
-            </Field>
-          )}
+      {/* Fórmula raíz + Oxidante raíz en la misma fila (cascada) */}
+      <div className="form-row">
+        <Field label="Fórmula raíz" htmlFor="v-fraiz">
+          <TextInput
+            id="v-fraiz"
+            value={form.formulaRaiz}
+            placeholder="Ej. 6.0 + 6.11"
+            onChange={(e) => set('formulaRaiz', e.target.value)}
+          />
+        </Field>
 
-          {/* Fórmula raíz + Oxidante raíz en la misma fila (cascada) */}
-          <div className="form-row">
-            <Field label="Fórmula raíz" htmlFor="v-fraiz">
+        {vis.oxidanteRaiz && (
+          <Field label="Oxidante raíz" htmlFor="v-oraiz">
+            <div className="field--cond">
               <TextInput
-                id="v-fraiz"
-                value={form.formulaRaiz}
-                placeholder="Ej. 6.0 + 6.11"
-                onChange={(e) => set('formulaRaiz', e.target.value)}
+                id="v-oraiz"
+                value={form.oxidanteRaiz}
+                placeholder="Ej. 20 vol"
+                onChange={(e) => set('oxidanteRaiz', e.target.value)}
+              />
+            </div>
+          </Field>
+        )}
+      </div>
+
+      {vis.tiempoRaiz && (
+        <Field label="Tiempo raíz" htmlFor="v-traiz">
+          <div className="field--cond">
+            <TextInput
+              id="v-traiz"
+              value={form.tiempoRaiz}
+              placeholder="Ej. 35 min"
+              onChange={(e) => set('tiempoRaiz', e.target.value)}
+            />
+          </div>
+        </Field>
+      )}
+
+      {/* Fórmula medios a puntas (oculta para "Retoque de raíz") */}
+      {vis.mediosBloque && (
+        <div className="field--cond">
+          <div className="form-row">
+            <Field label="Fórmula medios a puntas" htmlFor="v-fmed">
+              <TextInput
+                id="v-fmed"
+                value={form.formulaMediosAPuntas}
+                placeholder="Ej. 9.1"
+                onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
               />
             </Field>
 
-            {vis.oxidanteRaiz && (
-              <Field label="Oxidante raíz" htmlFor="v-oraiz">
-                <div className="field--cond">
-                  <TextInput
-                    id="v-oraiz"
-                    value={form.oxidanteRaiz}
-                    placeholder="Ej. 20 vol"
-                    onChange={(e) => set('oxidanteRaiz', e.target.value)}
-                  />
-                </div>
+            {vis.oxidanteMedios && (
+              <Field label="Oxidante medios a puntas" htmlFor="v-omed">
+                <TextInput
+                  id="v-omed"
+                  value={form.oxidanteMediosAPuntas}
+                  placeholder="Ej. 30 vol"
+                  onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
+                />
               </Field>
             )}
           </div>
 
-          {vis.tiempoRaiz && (
-            <Field label="Tiempo raíz" htmlFor="v-traiz">
-              <div className="field--cond">
-                <TextInput
-                  id="v-traiz"
-                  value={form.tiempoRaiz}
-                  placeholder="Ej. 35 min"
-                  onChange={(e) => set('tiempoRaiz', e.target.value)}
-                />
-              </div>
+          {vis.tiempoMedios && (
+            <Field label="Tiempo medios a puntas" htmlFor="v-tmed">
+              <TextInput
+                id="v-tmed"
+                value={form.tiempoMediosAPuntas}
+                placeholder="Ej. 40 min"
+                onChange={(e) => set('tiempoMediosAPuntas', e.target.value)}
+              />
             </Field>
           )}
-
-          {/* Fórmula medios a puntas (oculta para "Retoque de raíz") */}
-          {vis.mediosBloque && (
-            <div className="field--cond">
-              <div className="form-row">
-                <Field label="Fórmula medios a puntas" htmlFor="v-fmed">
-                  <TextInput
-                    id="v-fmed"
-                    value={form.formulaMediosAPuntas}
-                    placeholder="Ej. 9.1"
-                    onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
-                  />
-                </Field>
-
-                {vis.oxidanteMedios && (
-                  <Field label="Oxidante medios a puntas" htmlFor="v-omed">
-                    <TextInput
-                      id="v-omed"
-                      value={form.oxidanteMediosAPuntas}
-                      placeholder="Ej. 30 vol"
-                      onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
-                    />
-                  </Field>
-                )}
-              </div>
-
-              {vis.tiempoMedios && (
-                <Field label="Tiempo medios a puntas" htmlFor="v-tmed">
-                  <TextInput
-                    id="v-tmed"
-                    value={form.tiempoMediosAPuntas}
-                    placeholder="Ej. 40 min"
-                    onChange={(e) => set('tiempoMediosAPuntas', e.target.value)}
-                  />
-                </Field>
-              )}
-            </div>
-          )}
-
-          {/* Resultado y datos generales */}
-          <div className="form-row">
-            <Field label="Fecha" required error={errors.fecha} htmlFor="v-fecha">
-              <TextInput
-                id="v-fecha"
-                type="date"
-                value={form.fecha}
-                error={errors.fecha}
-                onChange={(e) => set('fecha', e.target.value)}
-              />
-            </Field>
-
-            <Field label="Precio" htmlFor="v-precio">
-              <TextInput
-                id="v-precio"
-                type="number"
-                inputMode="numeric"
-                value={form.precio}
-                placeholder="Ej. 15000"
-                onChange={(e) => set('precio', e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <div className="form-row">
-            <Field label="Color obtenido" htmlFor="v-color">
-              <TextInput
-                id="v-color"
-                value={form.colorObtenido}
-                placeholder="Ej. Rubio ceniza"
-                onChange={(e) => set('colorObtenido', e.target.value)}
-              />
-            </Field>
-
-            <Field label="Porcentaje de canas" htmlFor="v-canas">
-              <Select
-                id="v-canas"
-                options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
-                placeholder="—"
-                value={form.porcentajeCanas}
-                onChange={(e) => set('porcentajeCanas', e.target.value)}
-              />
-            </Field>
-          </div>
-
-          <Field label="Largo del cabello" htmlFor="v-largo">
-            <TextInput
-              id="v-largo"
-              value={form.largoCabello}
-              placeholder="Ej. Media melena"
-              onChange={(e) => set('largoCabello', e.target.value)}
-            />
-          </Field>
-
-          <Field label="Nota" htmlFor="v-nota">
-            <TextArea
-              id="v-nota"
-              value={form.nota}
-              placeholder="Observaciones de la aplicación…"
-              onChange={(e) => set('nota', e.target.value)}
-            />
-          </Field>
-
-          <Field label="Foto del resultado" hint="Por ahora solo se guarda una previsualización local.">
-            <input type="file" accept="image/*" className="foto-input" onChange={handleFoto} />
-            {form.fotoResultado && (
-              <div className="foto-preview">
-                <img className="foto-preview__img" src={form.fotoResultado} alt="Resultado" />
-                <div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    className="foto-preview__quitar"
-                    onClick={() => set('fotoResultado', '')}
-                  >
-                    Quitar foto
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Field>
-        </>
+        </div>
       )}
+
+      {/* Resultado y datos generales */}
+      <div className="form-row">
+        <Field label="Fecha" required error={errors.fecha} htmlFor="v-fecha">
+          <TextInput
+            id="v-fecha"
+            type="date"
+            value={form.fecha}
+            error={errors.fecha}
+            onChange={(e) => set('fecha', e.target.value)}
+          />
+        </Field>
+
+        {esAdmin && (
+          <Field label="Precio" htmlFor="v-precio" error={errors.precio}>
+            <TextInput
+              id="v-precio"
+              type="number"
+              inputMode="numeric"
+              min="0"
+              value={form.precio}
+              error={errors.precio}
+              placeholder="Ej. 15000"
+              onChange={(e) => set('precio', e.target.value)}
+            />
+          </Field>
+        )}
+      </div>
+
+      <div className="form-row">
+        <Field label="Color obtenido" htmlFor="v-color">
+          <TextInput
+            id="v-color"
+            value={form.colorObtenido}
+            placeholder="Ej. Rubio ceniza"
+            onChange={(e) => set('colorObtenido', e.target.value)}
+          />
+        </Field>
+
+        <Field label="Porcentaje de canas" htmlFor="v-canas">
+          <Select
+            id="v-canas"
+            options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
+            placeholder="—"
+            value={form.porcentajeCanas}
+            onChange={(e) => set('porcentajeCanas', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <Field label="Largo del cabello" htmlFor="v-largo">
+        <TextInput
+          id="v-largo"
+          value={form.largoCabello}
+          placeholder="Ej. Media melena"
+          onChange={(e) => set('largoCabello', e.target.value)}
+        />
+      </Field>
+
+      <Field label="Nota" htmlFor="v-nota">
+        <TextArea
+          id="v-nota"
+          value={form.nota}
+          placeholder="Observaciones de la aplicación…"
+          onChange={(e) => set('nota', e.target.value)}
+        />
+      </Field>
+
+      <Field
+        label="Foto del resultado"
+        hint="Se comprime automáticamente y se sube al guardar la visita."
+        error={errorFoto}
+      >
+        <input type="file" accept="image/*" className="foto-input" onChange={handleFoto} />
+        {form.fotoResultado && (
+          <div className="foto-preview">
+            <img className="foto-preview__img" src={form.fotoResultado} alt="Resultado" />
+            <div>
+              <Button
+                variant="danger"
+                size="sm"
+                className="foto-preview__quitar"
+                onClick={() => set('fotoResultado', '')}
+              >
+                Quitar foto
+              </Button>
+            </div>
+          </div>
+        )}
+      </Field>
     </Modal>
   )
 }

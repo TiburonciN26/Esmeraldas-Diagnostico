@@ -1,21 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context/AppContext'
-import {
-  getClienteById,
-  getDiagnosticoByClienteId,
-  getVisitasByClienteId,
-  deleteCliente,
-} from '../services'
+import { useSession } from '../context/SessionContext'
+import { useConfirm, useAlert } from '../context/ConfirmContext'
+import { getClienteCompleto, deleteCliente } from '../services'
 import TopBar from '../components/layout/TopBar'
 import Card, { Dato } from '../components/ui/Card'
 import Button from '../components/ui/Button'
-
-// Formatea precio como moneda simple.
-function fmtPrecio(v) {
-  if (v === '' || v == null) return ''
-  const n = Number(v)
-  return Number.isNaN(n) ? String(v) : `$${n.toLocaleString('es-AR')}`
-}
+import { fmtPrecio, fmtFecha } from '../utils/format'
 
 export default function ClienteDetalle() {
   const {
@@ -27,43 +18,64 @@ export default function ClienteDetalle() {
     openNuevaVisita,
     openVerVisita,
   } = useApp()
+  const { session } = useSession()
+  const esAdmin = session?.rol === 'administrador'
+  const confirmar = useConfirm()
+  const alertar = useAlert()
 
   const [cliente, setCliente] = useState(null)
   const [diagnostico, setDiagnostico] = useState(null)
   const [visitas, setVisitas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let vivo = true
     setLoading(true)
-    Promise.all([
-      getClienteById(selectedClienteId),
-      getDiagnosticoByClienteId(selectedClienteId),
-      getVisitasByClienteId(selectedClienteId),
-    ]).then(([c, d, v]) => {
-      if (!vivo) return
-      setCliente(c)
-      setDiagnostico(d)
-      setVisitas(v)
-      setLoading(false)
-    })
+    setLoadError(null)
+    getClienteCompleto(selectedClienteId)
+      .then(({ cliente: c, diagnostico: d, visitas: v }) => {
+        if (!vivo) return
+        setCliente(c)
+        setDiagnostico(d)
+        setVisitas(v)
+        setLoading(false)
+      })
+      .catch((err) => {
+        if (!vivo) return
+        console.error('Error cargando el cliente:', err)
+        setLoadError('No se pudo cargar la información del cliente.')
+        setLoading(false)
+      })
     return () => {
       vivo = false
     }
   }, [selectedClienteId, refreshTick])
 
   const handleEditCliente = () => openEditarCliente(selectedClienteId)
-  const handleNuevaVisita = () => openNuevaVisita(selectedClienteId)
-  const handleVerVisita = (visita) => openVerVisita(visita.id)
+  // visitas ya viene ordenada por fecha descendente (visitasDeCliente_ en el
+  // backend), así que visitas[0] es la última — se la pasamos de precarga
+  // sin ir a buscarla al servidor.
+  const handleNuevaVisita = () => openNuevaVisita(selectedClienteId, visitas[0] ?? null)
+  const handleVerVisita = (visita) => openVerVisita(visita)
 
   const handleDeleteCliente = async () => {
-    const ok = window.confirm(
-      `¿Eliminar a ${cliente.nombreCompleto}? (se puede recuperar, es un borrado suave)`
+    const ok = await confirmar(
+      `¿Eliminar a ${cliente.nombreCompleto}? (se puede recuperar, es un borrado suave)`,
+      { danger: true, confirmLabel: 'Eliminar' }
     )
     if (!ok) return
-    await deleteCliente(selectedClienteId)
-    refresh()
-    goHome()
+    setDeleting(true)
+    try {
+      await deleteCliente(selectedClienteId)
+      refresh()
+      goHome()
+    } catch (err) {
+      console.error('Error eliminando el cliente:', err)
+      await alertar('No se pudo eliminar. Revisá tu conexión e intentá de nuevo.')
+      setDeleting(false)
+    }
   }
 
   if (loading) {
@@ -71,6 +83,21 @@ export default function ClienteDetalle() {
       <>
         <TopBar title="Cliente" onBack={goHome} />
         <div className="loading">Cargando…</div>
+      </>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <>
+        <TopBar title="Cliente" onBack={goHome} />
+        <div className="page-error">
+          <div className="page-error__emoji">⚠️</div>
+          <p>{loadError}</p>
+          <Button variant="ghost" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
       </>
     )
   }
@@ -95,8 +122,8 @@ export default function ClienteDetalle() {
         onBack={goHome}
         right={
           <>
-            <Button variant="danger" size="sm" onClick={handleDeleteCliente}>
-              🗑️ Eliminar
+            <Button variant="danger" size="sm" onClick={handleDeleteCliente} disabled={deleting}>
+              {deleting ? 'Eliminando…' : '🗑️ Eliminar'}
             </Button>
             <Button variant="ghost" size="sm" onClick={handleEditCliente}>
               ✏️ Editar
@@ -112,7 +139,7 @@ export default function ClienteDetalle() {
           <div className="dato-grid dato-grid--split">
             <Dato label="Nombre completo">{cliente.nombreCompleto}</Dato>
             <Dato label="Teléfono">{cliente.telefono}</Dato>
-            <Dato label="Cumpleaños">{cliente.fechaCumpleanos}</Dato>
+            <Dato label="Cumpleaños">{fmtFecha(cliente.fechaCumpleanos)}</Dato>
           </div>
         </Card>
 
@@ -123,7 +150,7 @@ export default function ClienteDetalle() {
               <Dato label="Canas resistentes">{diagnostico.canasResistentes}</Dato>
               <Dato label="Alisado/keratina previa">{diagnostico.alisadoOKeratinaPrevia}</Dato>
               {diagnostico.alisadoOKeratinaPrevia === 'Sí' && (
-                <Dato label="Fecha alisado/keratina">{diagnostico.fechaAlisadoOKeratina}</Dato>
+                <Dato label="Fecha alisado/keratina">{fmtFecha(diagnostico.fechaAlisadoOKeratina)}</Dato>
               )}
               <Dato label="Grosor del cabello">{diagnostico.grosorCabello}</Dato>
             </div>
@@ -150,7 +177,7 @@ export default function ClienteDetalle() {
               <thead>
                 <tr>
                   <th>Tipo de aplicación</th>
-                  <th>Precio</th>
+                  {esAdmin && <th>Precio</th>}
                   <th>Fecha</th>
                   <th className="col-desktop">Decoloración — etapa</th>
                   <th className="col-desktop">Fórmula raíz</th>
@@ -170,8 +197,8 @@ export default function ClienteDetalle() {
                 {visitas.map((v) => (
                   <tr key={v.id} onClick={() => handleVerVisita(v)}>
                     <td>{v.tipoAplicacion}</td>
-                    <td>{fmtPrecio(v.precio)}</td>
-                    <td>{v.fecha}</td>
+                    {esAdmin && <td>{fmtPrecio(v.precio)}</td>}
+                    <td>{fmtFecha(v.fecha)}</td>
                     <td className="col-desktop">{v.decoloracionEtapa}</td>
                     <td className="col-desktop">{v.formulaRaiz}</td>
                     <td className="col-desktop">{v.oxidanteRaiz}</td>

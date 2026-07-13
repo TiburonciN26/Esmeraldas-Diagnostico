@@ -1,53 +1,32 @@
-// Servicio de Clientes.
-// Por ahora trabaja sobre los datos mock en memoria. La firma de cada función
-// (async + Promise) está pensada para reemplazar el cuerpo por fetch() al
-// Apps Script en la Fase 6 sin cambiar los componentes que las consumen.
+// Servicio de Clientes. Habla con el Apps Script (ver /apps-script/Code.gs)
+// a través de apiGet/apiPost — misma firma que en la fase de datos mock,
+// así que los componentes que lo consumen no cambiaron.
 
-import { mockDB } from '../data/mockData'
-import { genId, delay, clone } from './_utils'
+import { apiGet, apiPost } from './api'
 
-// Lista solo clientes activos (soft-delete: activo === true).
 export async function getClientes() {
-  await delay()
-  return clone(mockDB.clientes.filter((c) => c.activo))
+  return apiGet('getClientes')
 }
 
 export async function getClienteById(id) {
-  await delay()
-  const cliente = mockDB.clientes.find((c) => c.id === id && c.activo)
-  return cliente ? clone(cliente) : null
+  return apiGet('getClienteById', { id })
 }
 
-export async function createCliente(data) {
-  await delay()
-  const nuevo = {
-    id: genId('c'),
-    nombreCompleto: data.nombreCompleto ?? '',
-    telefono: data.telefono ?? '',
-    fechaCumpleanos: data.fechaCumpleanos ?? '',
-    activo: true,
-  }
-  mockDB.clientes.push(nuevo)
-  return clone(nuevo)
+// Cliente + diagnóstico + visitas en una sola llamada — usado por la
+// pantalla de Detalle para no disparar 3 requests en paralelo (cada una
+// paga aparte el arranque en frío de Apps Script).
+export async function getClienteCompleto(id) {
+  return apiGet('getClienteCompleto', { id })
 }
 
-export async function updateCliente(id, data) {
-  await delay()
-  const cliente = mockDB.clientes.find((c) => c.id === id)
-  if (!cliente) return null
-  Object.assign(cliente, {
-    nombreCompleto: data.nombreCompleto ?? cliente.nombreCompleto,
-    telefono: data.telefono ?? cliente.telefono,
-    fechaCumpleanos: data.fechaCumpleanos ?? cliente.fechaCumpleanos,
-  })
-  return clone(cliente)
+// Guarda cliente + diagnóstico en un solo request. id = null -> alta de
+// ambos; con id -> actualiza el cliente y crea o actualiza su diagnóstico
+// (lo resuelve el backend, que ya sabe si existía uno).
+export async function guardarClienteCompleto(id, cliente, diagnostico) {
+  return apiPost('guardarClienteCompleto', { id, cliente, diagnostico })
 }
 
 // Soft-delete: no borra el registro, solo marca activo = false.
 export async function deleteCliente(id) {
-  await delay()
-  const cliente = mockDB.clientes.find((c) => c.id === id)
-  if (!cliente) return false
-  cliente.activo = false
-  return true
+  return apiPost('deleteCliente', { id })
 }

@@ -1,46 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Search, LogOut } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { getClientes } from '../services'
+import { useSession } from '../context/SessionContext'
+import { normalizarTexto } from '../utils/format'
 import TopBar from '../components/layout/TopBar'
 import ClienteCard from '../components/clientes/ClienteCard'
 import Button from '../components/ui/Button'
 
 export default function Home() {
-  const { goDetalleCliente, refreshTick, openNuevoCliente } = useApp()
-  const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { goDetalleCliente, clientes, clientesLoaded, clientesError, refresh, openNuevoCliente } =
+    useApp()
+  const { session, logout } = useSession()
   const [busqueda, setBusqueda] = useState('')
 
-  useEffect(() => {
-    let vivo = true
-    setLoading(true)
-    getClientes().then((data) => {
-      if (vivo) {
-        setClientes(data)
-        setLoading(false)
-      }
-    })
-    return () => {
-      vivo = false
-    }
-  }, [refreshTick])
+  // La lista vive en AppContext (no acá) precisamente para que, al volver a
+  // Home, ya esté disponible al instante en vez de repetir el "Cargando…".
+  const loading = !clientesLoaded && !clientesError
+  const loadError = clientesLoaded ? null : clientesError
 
   const handleNuevo = () => openNuevoCliente()
 
   const clientesFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
+    const q = normalizarTexto(busqueda.trim())
     if (!q) return clientes
     return clientes.filter(
       (c) =>
-        c.nombreCompleto.toLowerCase().includes(q) ||
-        (c.telefono ?? '').toLowerCase().includes(q)
+        normalizarTexto(c.nombreCompleto).includes(q) ||
+        normalizarTexto(c.telefono).includes(q)
     )
   }, [clientes, busqueda])
 
   return (
     <>
-      <TopBar title="Clientes" bigTitle showLogo />
+      <TopBar
+        title="Clientes"
+        bigTitle
+        showLogo
+        right={
+          <Button
+            variant="ghost"
+            size="sm"
+            icon
+            title={session?.nombre ? `Salir (${session.nombre})` : 'Salir'}
+            aria-label="Cerrar sesión"
+            onClick={logout}
+          >
+            <LogOut size={16} strokeWidth={2.25} />
+          </Button>
+        }
+      />
 
       {!loading && clientes.length > 0 && (
         <div className="search-bar">
@@ -57,6 +65,14 @@ export default function Home() {
 
       {loading ? (
         <div className="loading">Cargando…</div>
+      ) : loadError ? (
+        <div className="page-error">
+          <div className="page-error__emoji">⚠️</div>
+          <p>{loadError}</p>
+          <Button variant="ghost" onClick={refresh}>
+            Reintentar
+          </Button>
+        </div>
       ) : clientes.length === 0 ? (
         <div className="empty">
           <div className="empty__emoji">💇‍♀️</div>

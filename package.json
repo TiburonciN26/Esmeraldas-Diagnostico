@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gas:login": "clasp login",
+    "gas:push": "cd apps-script && clasp push",
+    "gas:open": "cd apps-script && clasp open-script",
+    "gas:deployments": "cd apps-script && clasp deployments"
   },
   "dependencies": {
     "lucide-react": "^1.24.0",
@@ -14,6 +18,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@google/clasp": "^3.3.0",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.7"
   }

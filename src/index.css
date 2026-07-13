@@ -15,9 +15,13 @@
   --color-danger: #c0392b;
   --color-danger-soft: #fbeae8;
 
-  /* Acentos: claros, negros y rosa pastel (sin morados) */
+  /* Acentos: claros, negros y rosa pastel (sin morados).
+     - rosado-pastel: decorativo (bordes de tarjetas, avatares, hover).
+     - rosa-fuerte: funcional (foco, indicadores) — versión saturada con
+       contraste suficiente (WCAG >= 3:1) para no perderse sobre blanco. */
   --color-rosado-pastel: #ff8fc9;
-  --color-rojo-pastel: #ff8a80;
+  --color-rosa-fuerte: #e0518f;
+  --color-rojo-pastel: #ef5350;
   --accent-mint: #5fe3ac;
   /* Excepción semántica: cumpleaños de hoy */
   --color-amarillo-brillante: #ffd93d;
@@ -62,7 +66,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-rosado-pastel);
+  outline: 2px solid var(--color-rosa-fuerte);
   outline-offset: 2px;
 }
 
@@ -225,6 +229,12 @@ button {
   font-size: 0.8rem;
 }
 
+/* Empuja el botón al extremo izquierdo de un footer flex — separa acciones
+   destructivas (Eliminar) de las principales para evitar taps accidentales. */
+.btn--start {
+  margin-right: auto;
+}
+
 .btn--icon {
   padding: 7px 9px;
 }
@@ -260,10 +270,12 @@ button {
   border-color: var(--color-rosado-pastel);
 }
 
+/* Título de tarjeta (Detalle de cliente): más grande que las claves de
+   los datos (dato__k, 0.72rem) para que la jerarquía sea clara. */
 .card__label {
-  font-size: 0.72rem;
+  font-size: 0.92rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--color-text);
   margin-bottom: 10px;
   font-weight: 800;
@@ -389,8 +401,8 @@ button {
 
 .search-bar__input:focus {
   outline: none;
-  border-color: var(--color-rosado-pastel);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.2);
+  border-color: var(--color-rosa-fuerte);
+  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.25);
 }
 
 .cliente-list {
@@ -600,9 +612,55 @@ button {
 }
 
 .loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   text-align: center;
   padding: 40px;
   color: var(--color-text-soft);
+}
+
+/* Spinner real: sin esto, "Cargando…" es texto estático y se percibe como
+   que la app se congeló en vez de que está esperando al servidor. */
+.loading::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-rosa-fuerte);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error de carga de página completa (falló el fetch inicial) */
+.page-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--color-danger);
+}
+
+.page-error__emoji {
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+}
+
+/* Banner de error dentro de un formulario/modal (ej. falló el guardado) */
+.form-error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 14px;
 }
 
 /* ---------- Modal ---------- */
@@ -748,8 +806,8 @@ button {
 .select:focus,
 .textarea:focus {
   outline: none;
-  border-color: var(--color-rosado-pastel);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.25);
+  border-color: var(--color-rosa-fuerte);
+  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.3);
 }
 
 .textarea {
@@ -831,12 +889,14 @@ button {
   }
 }
 
+/* Título de sección dentro de modales: debe dominar visualmente sobre
+   los labels de campo (0.82rem), por eso es más grande que ellos. */
 .form-section-label {
-  font-size: 0.72rem;
+  font-size: 0.92rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 12px;
 }
 
@@ -873,4 +933,52 @@ button {
 
 .foto-input {
   font-size: 0.85rem;
+}
+
+/* ---------- Login ---------- */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-rosado-pastel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 28px 24px;
+}
+
+.login-card__logo {
+  height: 60px;
+  aspect-ratio: 2.3;
+  overflow: hidden;
+  border-radius: 6px;
+  margin: 0 auto 16px;
+}
+
+.login-card__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+  display: block;
+}
+
+.login-card__sub {
+  text-align: center;
+  margin: 0 0 18px;
+  font-size: 0.85rem;
+}
+
+.login-card__btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
 }

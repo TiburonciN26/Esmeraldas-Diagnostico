@@ -1,0 +1,29 @@
+// Utilidades de formato y texto compartidas por toda la app.
+
+// Formatea un precio numérico como moneda simple ($1.500). Deja pasar
+// strings no numéricos tal cual (por si en el futuro se guarda "s/d", etc.).
+export function fmtPrecio(v) {
+  if (v === '' || v == null) return ''
+  const n = Number(v)
+  return Number.isNaN(n) ? String(v) : `$${n.toLocaleString('es-AR')}`
+}
+
+// Convierte una fecha ISO (YYYY-MM-DD) a formato local dd/mm/aaaa para
+// mostrarla al usuario. Si no matchea el patrón, la devuelve sin tocar.
+export function fmtFecha(iso) {
+  if (!iso) return ''
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return String(iso)
+  const [, y, mes, dia] = m
+  return `${dia}/${mes}/${y}`
+}
+
+// Normaliza texto para búsquedas: minúsculas y sin tildes/diacríticos
+// (rango Unicode de combining marks U+0300–U+036F), de modo que "maria"
+// encuentre "María".
+export function normalizarTexto(s) {
+  return String(s ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+}

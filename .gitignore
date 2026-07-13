@@ -5,3 +5,10 @@ dist-ssr
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+.claude/
+
+# clasp: .clasp.json trae el scriptId real de TU proyecto de Apps Script —
+# no es secreto, pero es específico de cada instalación. Armalo a partir de
+# apps-script/.clasp.json.example (ver apps-script/README.md).
+apps-script/.clasp.json
+.clasprc.json
