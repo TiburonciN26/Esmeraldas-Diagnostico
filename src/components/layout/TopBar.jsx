@@ -11,7 +11,7 @@ export default function TopBar({ title, subtitle, onBack, right, showLogo, bigTi
         </button>
       )}
       <div className="topbar__titlewrap">
-        <div className={`topbar__title ${bigTitle ? 'topbar__title--lg' : ''}`}>{title}</div>
+        <h1 className={`topbar__title ${bigTitle ? 'topbar__title--lg' : ''}`}>{title}</h1>
         {subtitle && <div className="topbar__subtitle">{subtitle}</div>}
       </div>
       <div className="topbar__spacer" />

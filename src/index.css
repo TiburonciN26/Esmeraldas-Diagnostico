@@ -21,17 +21,54 @@
        contraste suficiente (WCAG >= 3:1) para no perderse sobre blanco. */
   --color-rosado-pastel: #ff8fc9;
   --color-rosa-fuerte: #e0518f;
-  --color-rojo-pastel: #ef5350;
-  --accent-mint: #5fe3ac;
+  /* 3.39:1 sobre blanco (WCAG 1.4.11) — el mint pastel original (#5fe3ac)
+     daba 1.61:1 y el borde del botón de WhatsApp prácticamente no se veía. */
+  --accent-mint: #0e9f6e;
   /* Excepción semántica: cumpleaños de hoy */
   --color-amarillo-brillante: #ffd93d;
 
   --radius: 14px;
   --radius-sm: 9px;
+  /* Antes había 7 radios distintos sin relación (6, 7, 8, 9, 14, 18, 999px)
+     para 4 pantallas. --radius y --radius-sm ya existían y se dejaron
+     igual (para no tocar lo que ya funcionaba); se suman estos 3 para
+     cubrir lo que faltaba, absorbiendo diferencias de 1px imperceptibles
+     (7px→xs, 8px→sm). */
+  --radius-xs: 6px;
+  --radius-lg: 18px;
+  --radius-full: 999px;
   --shadow: 0 2px 10px rgba(20, 20, 20, 0.07);
   --shadow-lg: 0 10px 32px rgba(20, 20, 20, 0.16);
 
   --maxw: 1100px;
+
+  /* Escala tipográfica: antes había 18 tamaños distintos sin relación
+     entre sí (diferencias de <1px que no se notan pero garantizan
+     inconsistencia al agregar pantallas nuevas). Cada valor de acá abajo
+     se mapeó al escalón más cercano de esta escala de 9 pasos. */
+  --fs-2xs: 0.7rem;
+  --fs-xs: 0.78rem;
+  --fs-sm: 0.85rem;
+  --fs-base: 0.92rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.1rem;
+  --fs-xl: 1.15rem;
+  --fs-2xl: 1.65rem;
+  --fs-emoji: 2.2rem;
+
+  /* Escala de espaciado: solo se aplica a los valores que ya coincidían
+     EXACTO con estos números (4/8/12/16/24px) en todo el archivo — es una
+     referencia por nombre sin cambiar ni un píxel de lo que ya se veía.
+     Los valores "impares" (11px, 14px, 18px, etc.) se dejaron como
+     literales a propósito: forzarlos a la escala habría cambiado layout
+     real (ej. el padding horizontal del shell) que no puedo verificar
+     visualmente sin navegador — mejor documentar la inconsistencia que
+     arriesgar romperla a ciegas. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
 
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--color-text);
@@ -51,6 +88,9 @@ body {
   background: var(--color-bg);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  /* Sin esto, el line-height por default del navegador (~1.2 en varios
+     contextos) hace más difícil leer notas/mensajes largos. */
+  line-height: 1.5;
 }
 
 h1,
@@ -68,6 +108,20 @@ button {
 :focus-visible {
   outline: 2px solid var(--color-rosa-fuerte);
   outline-offset: 2px;
+}
+
+/* Respeta la preferencia del sistema para gente con sensibilidad
+   vestibular (WCAG 2.3.3) — sin esto, el spinner, las entradas/salidas de
+   modal y el shimmer del skeleton corren siempre sin excepción. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ---------- Layout ---------- */
@@ -88,7 +142,7 @@ button {
   padding: 14px 11px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .topbar__titlewrap {
@@ -97,7 +151,7 @@ button {
 }
 
 .topbar__title {
-  font-size: 1.15rem;
+  font-size: var(--fs-xl);
   color: var(--color-text);
   font-weight: 700;
   white-space: nowrap;
@@ -106,11 +160,11 @@ button {
 }
 
 .topbar__title--lg {
-  font-size: 1.65rem;
+  font-size: var(--fs-2xl);
 }
 
 .topbar__subtitle {
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
   color: var(--color-text-soft);
   margin-top: 2px;
   white-space: nowrap;
@@ -125,7 +179,7 @@ button {
   border-radius: 50%;
   width: 38px;
   height: 38px;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -149,7 +203,7 @@ button {
   aspect-ratio: 2.3;
   overflow: hidden;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
 }
 
 .topbar__logo img {
@@ -165,7 +219,7 @@ button {
   border: 1.5px solid transparent;
   border-radius: var(--radius-sm);
   padding: 10px 16px;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
   display: inline-flex;
@@ -177,6 +231,16 @@ button {
   transform: translateY(1px);
 }
 
+/* pointer-events: none evita que :hover siga disparando en un botón
+   deshabilitado (el mouse "atraviesa" al elemento de atrás) — sin esto,
+   un botón disabled se veía idéntico a uno activo. */
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none;
+}
+
 /* Acción primaria: negro sólido + borde pastel brillante para destacar */
 .btn--primary {
   background: var(--color-primary);
@@ -184,8 +248,11 @@ button {
   border-color: var(--color-rosado-pastel);
 }
 
+/* #141414 -> #000000 es casi imperceptible por sí solo; el glow rosa
+   (mismo patrón que los focus rings de la app) es lo que realmente se nota. */
 .btn--primary:hover {
   background: var(--color-primary-dark);
+  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.25);
 }
 
 .btn--ghost {
@@ -219,14 +286,9 @@ button {
   background: #eafff6;
 }
 
-.btn--whatsapp:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .btn--sm {
   padding: 7px 11px;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
 }
 
 /* Empuja el botón al extremo izquierdo de un footer flex — separa acciones
@@ -246,9 +308,9 @@ button {
   bottom: 20px;
   z-index: 30;
   box-shadow: var(--shadow-lg);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 14px 20px;
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
 }
 
 /* ---------- Cards ---------- */
@@ -257,7 +319,7 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: var(--sp-4);
 }
 
 .card + .card {
@@ -270,10 +332,17 @@ button {
   border-color: var(--color-rosado-pastel);
 }
 
+/* 2px menos de padding en cada dirección — pedido puntual para las
+   tarjetas del modal de detalle de visita (no toca .card en el resto de
+   la app). */
+.card--tight {
+  padding: 14px;
+}
+
 /* Título de tarjeta (Detalle de cliente): más grande que las claves de
    los datos (dato__k, 0.72rem) para que la jerarquía sea clara. */
 .card__label {
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text);
@@ -289,6 +358,7 @@ button {
   cursor: pointer;
   padding-top: 6px;
   padding-bottom: 6px;
+  height: 100%;
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.05s;
 }
 
@@ -336,17 +406,21 @@ button {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
 }
 
 .cliente-card__info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .cliente-card__nombre {
+  min-width: 0;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--fs-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -356,9 +430,9 @@ button {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.85rem;
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
   color: var(--color-text-soft);
-  margin-top: 2px;
 }
 
 .cliente-card__tel svg {
@@ -368,6 +442,7 @@ button {
 
 .cliente-card__acciones {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
@@ -375,7 +450,7 @@ button {
 /* Buscador de clientes (Home, debajo del header) */
 .search-bar {
   position: relative;
-  margin-bottom: 16px;
+  margin-bottom: var(--sp-4);
 }
 
 .search-bar__icon {
@@ -387,12 +462,35 @@ button {
   pointer-events: none;
 }
 
+.search-bar__clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-text-soft);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.search-bar__clear:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
 .search-bar__input {
   width: 100%;
   border: 1.5px solid var(--color-border);
-  border-radius: 999px;
-  padding: 11px 16px 11px 40px;
-  font-size: 0.92rem;
+  border-radius: var(--radius-full);
+  padding: 11px 40px 11px 40px;
+  /* 16px fijo (no rem): por debajo de 16px, Safari iOS hace zoom forzado
+     al enfocar el campo y la pantalla queda ampliada/descentrada. */
+  font-size: 16px;
   font-family: inherit;
   background: var(--color-surface);
   color: var(--color-text);
@@ -408,7 +506,63 @@ button {
 .cliente-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: var(--sp-2);
+}
+
+/* ---------- Skeleton (Home, mientras carga la primera vez) ---------- */
+.skeleton-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-border) 25%, #f0f0f0 37%, var(--color-border) 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-xs);
+}
+
+.skeleton--avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeleton-card__lines {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.skeleton--line {
+  height: 12px;
+}
+
+.skeleton--line-lg {
+  width: 60%;
+}
+
+.skeleton--line-sm {
+  width: 40%;
+  height: 10px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
 }
 
 @media (min-width: 640px) {
@@ -423,10 +577,6 @@ button {
   }
 }
 
-.cliente-card {
-  height: 100%;
-}
-
 /* Bug fix: ".card + .card" (pensado para listas apiladas) agregaba un
    margin-top extra a cada card salvo la primera, incluso dentro del grid
    de clientes (que ya separa con "gap"). Eso desalineaba la 2da tarjeta
@@ -439,7 +589,7 @@ button {
 .dato-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 @media (min-width: 560px) {
@@ -453,7 +603,7 @@ button {
 }
 
 .dato__k {
-  font-size: 0.72rem;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-soft);
@@ -461,7 +611,7 @@ button {
 }
 
 .dato__v {
-  font-size: 0.95rem;
+  font-size: var(--fs-base);
   margin-top: 2px;
   word-break: break-word;
 }
@@ -472,7 +622,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 /* Variante "en par": 2 columnas fijas (sin breakpoint), para campos cortos
@@ -480,7 +630,18 @@ button {
 .dato-grid--pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--sp-3);
+}
+
+/* Fórmula + oxígeno + tiempo, de solo lectura, en una sola fila (ver
+   VisitaDetalleModal). 2fr 1fr 1fr (no 3 columnas iguales) porque la
+   fórmula suele ser el texto más largo de los 3 — con columnas iguales
+   rompía a una segunda línea mientras oxígeno y tiempo dejaban espacio
+   vacío de sobra sin usar. */
+.dato-grid--trio {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--sp-3);
 }
 
 .dato-grid--split .dato__v {
@@ -497,7 +658,7 @@ button {
 }
 
 .card__header h2 {
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   color: var(--color-text);
 }
 
@@ -525,13 +686,14 @@ button {
 
 /* ---------- Tabla de visitas ---------- */
 .visitas-wrap {
+  position: relative;
   overflow-x: auto;
 }
 
 .visitas-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
 }
 
 .visitas-table th,
@@ -543,7 +705,7 @@ button {
 }
 
 .visitas-table th {
-  font-size: 0.72rem;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-soft);
@@ -551,17 +713,63 @@ button {
 
 .visitas-table tbody tr {
   cursor: pointer;
+  background: var(--color-surface);
 }
 
 .visitas-table tbody tr:hover {
   background: var(--color-primary-soft);
 }
 
+/* Primera columna fija al hacer scroll horizontal, para no perder de
+   vista a qué visita corresponde cada fila. background: inherit hace que
+   siga el color de fondo real de su fila (blanco normal, gris en hover). */
+.visitas-table th:first-child,
+.visitas-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.visitas-table thead th:first-child {
+  background: var(--color-surface);
+}
+
+.visitas-table tbody td:first-child {
+  background: inherit;
+}
+
 /* La lista de visitas viene ordenada de más reciente a más antigua, así
-   que la primera fila es siempre la última visita registrada. */
+   que la primera fila es siempre la última visita registrada. Antes era
+   un outline en el <tr>, pero outline en filas de una tabla con
+   border-collapse: collapse se renderiza mal en varios navegadores (se
+   corta, no cierra el marco) — un solo acento a la izquierda (en la
+   columna fija, así queda visible aunque se haga scroll horizontal) más
+   un tinte de fondo es más robusto. El badge de texto de al lado sigue sin
+   depender del color para transmitir la info (WCAG 1.4.1). */
 .visitas-table tbody tr:first-child {
-  outline: 2px solid var(--color-rosado-pastel);
-  outline-offset: -2px;
+  background: #fff5fa;
+}
+
+.visitas-table tbody tr:first-child:hover {
+  background: #ffeaf5;
+}
+
+.visitas-table tbody tr:first-child td:first-child {
+  border-left: 3px solid var(--color-rosa-fuerte);
+}
+
+.badge-ultima {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-rosa-fuerte);
+  color: #fff;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
 }
 
 .col-nota {
@@ -578,7 +786,7 @@ button {
 .col-foto__thumb {
   width: 34px;
   height: 34px;
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   object-fit: cover;
   border: 1px solid var(--color-border);
   display: block;
@@ -603,19 +811,59 @@ button {
 }
 
 .empty__emoji {
-  font-size: 2.2rem;
-  margin-bottom: 8px;
+  font-size: var(--fs-emoji);
+  margin-bottom: var(--sp-2);
 }
 
 .muted {
   color: var(--color-text-soft);
 }
 
+/* Oculta visualmente pero deja disponible para lectores de pantalla —
+   para anunciar estados (ej. "Cargando…") sin duplicar texto en pantalla. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Toast (aviso breve de éxito) ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+  background: var(--color-primary);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: var(--radius-full);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 0.2s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
 .loading {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   text-align: center;
   padding: 40px;
   color: var(--color-text-soft);
@@ -647,8 +895,8 @@ button {
 }
 
 .page-error__emoji {
-  font-size: 2.2rem;
-  margin-bottom: 8px;
+  font-size: var(--fs-emoji);
+  margin-bottom: var(--sp-2);
 }
 
 /* Banner de error dentro de un formulario/modal (ej. falló el guardado) */
@@ -658,7 +906,7 @@ button {
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   margin-bottom: 14px;
 }
@@ -680,7 +928,7 @@ button {
 @media (min-width: 640px) {
   .modal-overlay {
     align-items: center;
-    padding: 24px;
+    padding: var(--sp-5);
   }
 }
 
@@ -690,13 +938,33 @@ button {
   }
 }
 
+/* Animación de salida — antes el modal desaparecía de golpe al cerrar
+   (entraba deslizando pero se esfumaba sin transición). El timer que
+   agrega/quita esta clase vive en Modal.jsx (EXIT_MS, tiene que coincidir
+   con la duración de acá abajo). */
+.modal-overlay--closing {
+  animation: overlay-out 0.15s ease forwards;
+}
+
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Fuerza el modal centrado incluso en mobile (donde por defecto es un
+   bottom-sheet pegado abajo) — opt-in vía la prop "centered" de Modal. */
+.modal-overlay--centered {
+  align-items: center;
+  padding: var(--sp-4);
+}
+
 .modal {
   background: var(--color-surface);
   width: 100%;
   max-width: 560px;
   max-height: 92vh;
-  border-radius: 18px 18px 0 0;
-  border-top: 4px solid var(--color-rosado-pastel);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -705,8 +973,14 @@ button {
 
 @media (min-width: 640px) {
   .modal {
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
   }
+}
+
+/* Con el overlay centrado no queda pegado a ningún borde, así que
+   redondea las 4 esquinas siempre (no solo desde el breakpoint de escritorio). */
+.modal--centered {
+  border-radius: var(--radius-lg);
 }
 
 @keyframes modal-in {
@@ -716,16 +990,27 @@ button {
   }
 }
 
+.modal--closing {
+  animation: modal-out 0.18s ease forwards;
+}
+
+@keyframes modal-out {
+  to {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
 .modal__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px 6px;
+  gap: var(--sp-3);
+  padding: 14px 16px 4px;
 }
 
 .modal__title {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   color: var(--color-text);
   font-weight: 700;
 }
@@ -733,11 +1018,11 @@ button {
 .modal__close {
   background: transparent;
   border: none;
-  font-size: 1.65rem;
+  font-size: var(--fs-2xl);
   line-height: 1;
   color: var(--color-text-soft);
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .modal__close:hover {
@@ -746,7 +1031,7 @@ button {
 }
 
 .modal__body {
-  padding: 6px 18px 16px;
+  padding: 4px 16px 14px;
   overflow-y: auto;
 }
 
@@ -754,7 +1039,7 @@ button {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -769,23 +1054,26 @@ button {
 
 .field__label {
   display: block;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--color-text);
 }
 
-/* Asterisco de campo obligatorio: convención para todos los formularios. */
+/* Asterisco de campo obligatorio: convención para todos los formularios.
+   Mismo rojo que los errores (--color-danger) — antes eran dos rojos
+   distintos sin relación entre sí para la misma idea semántica ("algo
+   necesita tu atención"). */
 .field__required {
-  color: var(--color-rojo-pastel);
+  color: var(--color-danger);
   font-weight: 700;
   margin-left: 2px;
 }
 
 .field__hint {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--color-text-soft);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
 }
 
 .input,
@@ -795,11 +1083,39 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  font-size: 0.95rem;
+  /* 16px fijo (no rem): por debajo de 16px, Safari iOS hace zoom forzado
+     al enfocar el campo y la pantalla queda ampliada/descentrada. */
+  font-size: 16px;
   font-family: inherit;
   background: var(--color-surface);
   color: var(--color-text);
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+/* Input angosto que crece con el contenido (fórmula/oxígeno/tiempo) — ver
+   AutoGrowInput en Field.jsx. El span espejo copia el padding/fuente/borde
+   del .input real para que su ancho medido sea el que el input necesita. */
+.autogrow {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.autogrow .input {
+  width: auto;
+  max-width: 100%;
+}
+
+.autogrow__mirror {
+  position: absolute;
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+  white-space: pre;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  font-size: 16px;
+  font-family: inherit;
 }
 
 .input:focus,
@@ -843,9 +1159,9 @@ button {
 }
 
 .field__error {
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   color: var(--color-danger);
-  margin-top: 4px;
+  margin-top: var(--sp-1);
 }
 
 /* Grupo de opciones tipo segmented (Sí / No) */
@@ -861,7 +1177,7 @@ button {
   border: none;
   background: transparent;
   padding: 9px 20px;
-  font-size: 0.9rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--color-text-soft);
 }
@@ -875,29 +1191,54 @@ button {
   color: #fff;
 }
 
-/* Dos columnas dentro del formulario en pantallas medianas */
+/* Dos columnas dentro del formulario — 360px (no 480px) porque los
+   celulares reales rondan 360-430px de ancho (ej. Galaxy S20 Ultra: 412px);
+   con 480px como piso, NINGÚN teléfono llegaba a ver la fila de 2
+   columnas, solo tablets/desktop. 320px (el piso real más angosto, ej.
+   iPhone SE viejo) se queda apilado porque ahí sí no entran cómodos. */
 .form-row {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
 }
 
-@media (min-width: 480px) {
+@media (min-width: 360px) {
   .form-row {
     grid-template-columns: 1fr 1fr;
     gap: 14px;
   }
 }
 
+/* Variante para filas donde el segundo campo es mucho más corto que el
+   primero (ej. Tipo de aplicación + Porcentaje de canas) — 1fr 1fr le daba
+   al segundo el mismo ancho que al primero sin necesitarlo. */
+@media (min-width: 360px) {
+  .form-row--2-1 {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+/* Fórmula + oxígeno + tiempo en una sola fila — los 3 campos son
+   AutoGrowInput (ver Field.jsx), así que a diferencia de .form-row (grid
+   2 columnas 1fr 1fr) acá cada uno ocupa solo lo que necesita su propio
+   contenido; flex-wrap para que en pantallas muy angostas el que no entre
+   baje de línea en vez de desbordar. */
+.formula-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 /* Título de sección dentro de modales: debe dominar visualmente sobre
    los labels de campo (0.82rem), por eso es más grande que ellos. */
 .form-section-label {
-  font-size: 0.92rem;
+  font-size: var(--fs-base);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text);
   font-weight: 800;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-3);
 }
 
 /* Campo que aparece por lógica condicional (leve animación de entrada) */
@@ -914,7 +1255,7 @@ button {
 
 /* ---------- Foto de resultado ---------- */
 .foto-preview {
-  margin-top: 8px;
+  margin-top: var(--sp-2);
   position: relative;
   display: inline-block;
 }
@@ -928,11 +1269,34 @@ button {
 }
 
 .foto-preview__quitar {
-  margin-top: 8px;
+  margin-top: var(--sp-2);
 }
 
 .foto-input {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
+  color: var(--color-text-soft);
+}
+
+/* Restylar el botón nativo del input de archivo (soportado en navegadores
+   modernos) en vez de reconstruirlo a mano con un <label> — así se
+   conserva gratis todo el comportamiento nativo de foco/teclado/lector de
+   pantalla del control real. */
+.foto-input::file-selector-button {
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  padding: 8px 14px;
+  margin-right: 10px;
+  border: 1.5px solid var(--color-rosado-pastel);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.foto-input::file-selector-button:hover {
+  background: var(--color-primary-soft);
 }
 
 /* ---------- Login ---------- */
@@ -941,7 +1305,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--sp-5);
 }
 
 .login-card {
@@ -959,7 +1323,7 @@ button {
   height: 60px;
   aspect-ratio: 2.3;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   margin: 0 auto 16px;
 }
 
@@ -974,11 +1338,40 @@ button {
 .login-card__sub {
   text-align: center;
   margin: 0 0 18px;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field .input {
+  padding-right: 40px;
+}
+
+.password-field__toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-xs);
+  color: var(--color-text-soft);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.password-field__toggle:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
 }
 
 .login-card__btn {
   width: 100%;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: var(--sp-1);
 }

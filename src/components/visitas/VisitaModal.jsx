@@ -2,14 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { useSession } from '../../context/SessionContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { useToast } from '../../context/ToastContext'
 import { createVisita, updateVisita, visitaVacia } from '../../services'
-import { TIPOS_APLICACION, PORCENTAJE_CANAS } from '../../data/constants'
+import {
+  TIPOS_APLICACION,
+  PORCENTAJE_CANAS,
+  LARGO_CABELLO,
+  COLORES_OBTENIDOS,
+} from '../../data/constants'
 import { hoyISO } from '../../utils/date'
 import { calcularVisibilidad } from '../../utils/visitaLogic'
 import { comprimirImagen } from '../../utils/image'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
-import { Field, TextInput, TextArea, Select } from '../ui/Field'
+import { Field, TextInput, AutoGrowInput, TextArea, Select } from '../ui/Field'
 
 // Campos que se copian desde la última visita al crear una nueva.
 // (No se copian ni "fecha" -> hoy, ni "fotoResultado" -> vacía.)
@@ -34,6 +40,7 @@ export default function VisitaModal() {
   const { session } = useSession()
   const esAdmin = session?.rol === 'administrador'
   const confirmar = useConfirm()
+  const toast = useToast()
   const { open, clienteId, visitaId, visita } = visitaModal
   const esEdicion = Boolean(visitaId)
 
@@ -66,8 +73,6 @@ export default function VisitaModal() {
     setForm(datos)
     inicialRef.current = JSON.stringify(datos)
   }, [open, visitaId, esEdicion, visita])
-
-  if (!open) return null
 
   const vis = calcularVisibilidad(form)
   const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
@@ -134,6 +139,7 @@ export default function VisitaModal() {
 
       refresh()
       closeVisitaModal()
+      toast(esEdicion ? 'Visita actualizada' : 'Visita guardada')
     } catch (err) {
       console.error('Error guardando la visita:', err)
       setSaveError('No se pudo guardar. Revisá tu conexión e intentá de nuevo.')
@@ -152,6 +158,8 @@ export default function VisitaModal() {
 
   return (
     <Modal
+      open={open}
+      centered
       title={esEdicion ? 'Editar visita' : 'Nueva visita'}
       onClose={cerrarConGuardia}
       footer={
@@ -165,18 +173,41 @@ export default function VisitaModal() {
         </>
       }
     >
-      {saveError && <div className="form-error">{saveError}</div>}
+      {saveError && (
+        <div className="form-error" role="alert">
+          {saveError}
+        </div>
+      )}
 
-      <Field label="Tipo de aplicación" required error={errors.tipoAplicacion} htmlFor="v-tipo">
-        <Select
-          id="v-tipo"
-          options={TIPOS_APLICACION}
-          placeholder="Elegir…"
-          value={form.tipoAplicacion}
-          error={errors.tipoAplicacion}
-          onChange={(e) => set('tipoAplicacion', e.target.value)}
-        />
-      </Field>
+      {/* Tipo de aplicación conserva su placeholder ("Elegir…") a propósito:
+          es un campo obligatorio, y un <select> sin opción vacía siempre
+          muestra la primera opción como si ya estuviera elegida — si el
+          usuario la quiere de verdad, no puede "reseleccionarla" (un
+          <select> nativo no dispara onChange si no cambia el valor), así
+          que el campo quedaría atascado en vacío sin poder guardar. Los
+          demás campos de acá abajo son opcionales, así que no tienen ese
+          problema y se les sacó el placeholder como pediste. */}
+      <div className="form-row form-row--2-1">
+        <Field label="Tipo de aplicación" required error={errors.tipoAplicacion} htmlFor="v-tipo">
+          <Select
+            id="v-tipo"
+            options={TIPOS_APLICACION}
+            placeholder="Elegir…"
+            value={form.tipoAplicacion}
+            error={errors.tipoAplicacion}
+            onChange={(e) => set('tipoAplicacion', e.target.value)}
+          />
+        </Field>
+
+        <Field label="% de canas" htmlFor="v-canas">
+          <Select
+            id="v-canas"
+            options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
+            value={form.porcentajeCanas}
+            onChange={(e) => set('porcentajeCanas', e.target.value)}
+          />
+        </Field>
+      </div>
 
       {/* Condicional: decoloración - etapa */}
       {vis.decoloracion && (
@@ -185,82 +216,80 @@ export default function VisitaModal() {
             <TextInput
               id="v-decol"
               value={form.decoloracionEtapa}
-              placeholder="Ej. Etapa 2 - fondo naranja"
               onChange={(e) => set('decoloracionEtapa', e.target.value)}
             />
           </div>
         </Field>
       )}
 
-      {/* Fórmula raíz + Oxidante raíz en la misma fila (cascada) */}
-      <div className="form-row">
+      {/* Fórmula + oxígeno + tiempo (raíz), los 3 en una fila */}
+      <div className="formula-row">
         <Field label="Fórmula raíz" htmlFor="v-fraiz">
-          <TextInput
+          <AutoGrowInput
             id="v-fraiz"
+            minChars={15}
             value={form.formulaRaiz}
-            placeholder="Ej. 6.0 + 6.11"
             onChange={(e) => set('formulaRaiz', e.target.value)}
           />
         </Field>
 
         {vis.oxidanteRaiz && (
-          <Field label="Oxidante raíz" htmlFor="v-oraiz">
+          <Field label="Oxigenta Vol" htmlFor="v-oraiz">
             <div className="field--cond">
-              <TextInput
+              <AutoGrowInput
                 id="v-oraiz"
+                minChars={8}
                 value={form.oxidanteRaiz}
-                placeholder="Ej. 20 vol"
                 onChange={(e) => set('oxidanteRaiz', e.target.value)}
+              />
+            </div>
+          </Field>
+        )}
+
+        {vis.tiempoRaiz && (
+          <Field label="Tiempo" htmlFor="v-traiz">
+            <div className="field--cond">
+              <AutoGrowInput
+                id="v-traiz"
+                minChars={6}
+                value={form.tiempoRaiz}
+                onChange={(e) => set('tiempoRaiz', e.target.value)}
               />
             </div>
           </Field>
         )}
       </div>
 
-      {vis.tiempoRaiz && (
-        <Field label="Tiempo raíz" htmlFor="v-traiz">
-          <div className="field--cond">
-            <TextInput
-              id="v-traiz"
-              value={form.tiempoRaiz}
-              placeholder="Ej. 35 min"
-              onChange={(e) => set('tiempoRaiz', e.target.value)}
-            />
-          </div>
-        </Field>
-      )}
-
-      {/* Fórmula medios a puntas (oculta para "Retoque de raíz") */}
+      {/* Fórmula + oxígeno + tiempo (medios a puntas), los 3 en una fila
+          (oculto para "Retoque de raíz") */}
       {vis.mediosBloque && (
-        <div className="field--cond">
-          <div className="form-row">
-            <Field label="Fórmula medios a puntas" htmlFor="v-fmed">
-              <TextInput
-                id="v-fmed"
-                value={form.formulaMediosAPuntas}
-                placeholder="Ej. 9.1"
-                onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
+        <div className="field--cond formula-row">
+          <Field label="Fórmula medios a puntas" htmlFor="v-fmed">
+            <AutoGrowInput
+              id="v-fmed"
+              minChars={15}
+              value={form.formulaMediosAPuntas}
+              onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
+            />
+          </Field>
+
+          {vis.oxidanteMedios && (
+            <Field label="Oxigenta" htmlFor="v-omed">
+              <AutoGrowInput
+                id="v-omed"
+                minChars={6}
+                value={form.oxidanteMediosAPuntas}
+                onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
               />
             </Field>
-
-            {vis.oxidanteMedios && (
-              <Field label="Oxidante medios a puntas" htmlFor="v-omed">
-                <TextInput
-                  id="v-omed"
-                  value={form.oxidanteMediosAPuntas}
-                  placeholder="Ej. 30 vol"
-                  onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
-                />
-              </Field>
-            )}
-          </div>
+          )}
 
           {vis.tiempoMedios && (
-            <Field label="Tiempo medios a puntas" htmlFor="v-tmed">
-              <TextInput
+            <Field label="Tiempo" htmlFor="v-tmed">
+              <AutoGrowInput
                 id="v-tmed"
+                minChars={6}
                 value={form.tiempoMediosAPuntas}
-                placeholder="Ej. 40 min"
                 onChange={(e) => set('tiempoMediosAPuntas', e.target.value)}
               />
             </Field>
@@ -269,6 +298,26 @@ export default function VisitaModal() {
       )}
 
       {/* Resultado y datos generales */}
+      <div className="form-row">
+        <Field label="Color obtenido" htmlFor="v-color">
+          <Select
+            id="v-color"
+            options={COLORES_OBTENIDOS}
+            value={form.colorObtenido}
+            onChange={(e) => set('colorObtenido', e.target.value)}
+          />
+        </Field>
+
+        <Field label="Largo del cabello" htmlFor="v-largo">
+          <Select
+            id="v-largo"
+            options={LARGO_CABELLO}
+            value={form.largoCabello}
+            onChange={(e) => set('largoCabello', e.target.value)}
+          />
+        </Field>
+      </div>
+
       <div className="form-row">
         <Field label="Fecha" required error={errors.fecha} htmlFor="v-fecha">
           <TextInput
@@ -289,58 +338,29 @@ export default function VisitaModal() {
               min="0"
               value={form.precio}
               error={errors.precio}
-              placeholder="Ej. 15000"
               onChange={(e) => set('precio', e.target.value)}
             />
           </Field>
         )}
       </div>
 
-      <div className="form-row">
-        <Field label="Color obtenido" htmlFor="v-color">
-          <TextInput
-            id="v-color"
-            value={form.colorObtenido}
-            placeholder="Ej. Rubio ceniza"
-            onChange={(e) => set('colorObtenido', e.target.value)}
-          />
-        </Field>
-
-        <Field label="Porcentaje de canas" htmlFor="v-canas">
-          <Select
-            id="v-canas"
-            options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
-            placeholder="—"
-            value={form.porcentajeCanas}
-            onChange={(e) => set('porcentajeCanas', e.target.value)}
-          />
-        </Field>
-      </div>
-
-      <Field label="Largo del cabello" htmlFor="v-largo">
-        <TextInput
-          id="v-largo"
-          value={form.largoCabello}
-          placeholder="Ej. Media melena"
-          onChange={(e) => set('largoCabello', e.target.value)}
-        />
-      </Field>
-
       <Field label="Nota" htmlFor="v-nota">
-        <TextArea
-          id="v-nota"
-          value={form.nota}
-          placeholder="Observaciones de la aplicación…"
-          onChange={(e) => set('nota', e.target.value)}
-        />
+        <TextArea id="v-nota" value={form.nota} onChange={(e) => set('nota', e.target.value)} />
       </Field>
 
       <Field
         label="Foto del resultado"
+        htmlFor="v-foto"
         hint="Se comprime automáticamente y se sube al guardar la visita."
         error={errorFoto}
       >
-        <input type="file" accept="image/*" className="foto-input" onChange={handleFoto} />
+        <input
+          type="file"
+          id="v-foto"
+          accept="image/*"
+          className="foto-input"
+          onChange={handleFoto}
+        />
         {form.fotoResultado && (
           <div className="foto-preview">
             <img className="foto-preview__img" src={form.fotoResultado} alt="Resultado" />

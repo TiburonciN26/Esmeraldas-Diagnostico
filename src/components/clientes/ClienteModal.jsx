@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { useToast } from '../../context/ToastContext'
 import { getClienteById, getDiagnosticoByClienteId, guardarClienteCompleto } from '../../services'
 import { GROSOR_CABELLO, SI_NO } from '../../data/constants'
 import Modal from '../ui/Modal'
@@ -21,6 +22,7 @@ const FORM_VACIO = {
 export default function ClienteModal() {
   const { clienteModal, closeClienteModal, refresh } = useApp()
   const confirmar = useConfirm()
+  const toast = useToast()
   const { open, clienteId } = clienteModal
   const esEdicion = Boolean(clienteId)
 
@@ -73,8 +75,6 @@ export default function ClienteModal() {
     }
   }, [open, clienteId, esEdicion, retryTick])
 
-  if (!open) return null
-
   const set = (campo, valor) => setForm((f) => ({ ...f, [campo]: valor }))
 
   // Cierra pidiendo confirmación si hay cambios sin guardar.
@@ -126,6 +126,7 @@ export default function ClienteModal() {
       await guardarClienteCompleto(esEdicion ? clienteId : null, datosCliente, datosDiagnostico)
       refresh()
       closeClienteModal()
+      toast(esEdicion ? 'Cliente actualizado' : 'Cliente creado')
     } catch (err) {
       console.error('Error guardando cliente:', err)
       setSaveError('No se pudo guardar. Revisá tu conexión e intentá de nuevo.')
@@ -136,6 +137,7 @@ export default function ClienteModal() {
 
   return (
     <Modal
+      open={open}
       title={esEdicion ? 'Editar cliente' : 'Nuevo cliente'}
       onClose={cerrarConGuardia}
       footer={
@@ -161,11 +163,15 @@ export default function ClienteModal() {
         </div>
       ) : (
         <>
-          {saveError && <div className="form-error">{saveError}</div>}
+          {saveError && (
+            <div className="form-error" role="alert">
+              {saveError}
+            </div>
+          )}
 
           {/* Sección 1: datos del cliente */}
           <div className="card card--accent">
-            <div className="form-section-label">Datos del cliente</div>
+            <h3 className="form-section-label">Datos del cliente</h3>
 
             <Field
               label="Nombre completo"
@@ -205,7 +211,7 @@ export default function ClienteModal() {
 
           {/* Sección 2: diagnóstico */}
           <div className="card card--accent">
-            <div className="form-section-label">Diagnóstico</div>
+            <h3 className="form-section-label">Diagnóstico</h3>
 
             <div className="form-row">
               <Field label="Canas resistentes">

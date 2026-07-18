@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Search, LogOut } from 'lucide-react'
+import { Search, LogOut, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useSession } from '../context/SessionContext'
+import { useConfirm } from '../context/ConfirmContext'
 import { normalizarTexto } from '../utils/format'
 import TopBar from '../components/layout/TopBar'
 import ClienteCard from '../components/clientes/ClienteCard'
@@ -11,6 +12,7 @@ export default function Home() {
   const { goDetalleCliente, clientes, clientesLoaded, clientesError, refresh, openNuevoCliente } =
     useApp()
   const { session, logout } = useSession()
+  const confirmar = useConfirm()
   const [busqueda, setBusqueda] = useState('')
 
   // La lista vive en AppContext (no acá) precisamente para que, al volver a
@@ -19,6 +21,13 @@ export default function Home() {
   const loadError = clientesLoaded ? null : clientesError
 
   const handleNuevo = () => openNuevoCliente()
+
+  // Confirmación para evitar cierres accidentales — el botón está en la
+  // esquina, justo donde caen los taps sin querer en un celular.
+  const handleLogout = async () => {
+    const ok = await confirmar('¿Cerrar sesión?')
+    if (ok) logout()
+  }
 
   const clientesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda.trim())
@@ -43,7 +52,7 @@ export default function Home() {
             icon
             title={session?.nombre ? `Salir (${session.nombre})` : 'Salir'}
             aria-label="Cerrar sesión"
-            onClick={logout}
+            onClick={handleLogout}
           >
             <LogOut size={16} strokeWidth={2.25} />
           </Button>
@@ -57,14 +66,40 @@ export default function Home() {
             type="text"
             className="search-bar__input"
             placeholder="Buscar por nombre o teléfono…"
+            aria-label="Buscar clientes por nombre o teléfono"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
           />
+          {busqueda && (
+            <button
+              type="button"
+              className="search-bar__clear"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setBusqueda('')}
+            >
+              <X size={14} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       )}
 
       {loading ? (
-        <div className="loading">Cargando…</div>
+        <>
+          <span className="sr-only" role="status">
+            Cargando clientes…
+          </span>
+          <div className="cliente-list" aria-hidden="true">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton skeleton--avatar" />
+                <div className="skeleton-card__lines">
+                  <div className="skeleton skeleton--line skeleton--line-lg" />
+                  <div className="skeleton skeleton--line skeleton--line-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       ) : loadError ? (
         <div className="page-error">
           <div className="page-error__emoji">⚠️</div>

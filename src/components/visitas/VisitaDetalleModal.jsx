@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Trash2, Pencil } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useSession } from '../../context/SessionContext'
 import { useConfirm, useAlert } from '../../context/ConfirmContext'
+import { useToast } from '../../context/ToastContext'
 import { deleteVisita } from '../../services'
 import { calcularVisibilidad } from '../../utils/visitaLogic'
 import { fmtPrecio, fmtFecha } from '../../utils/format'
@@ -19,19 +21,28 @@ export default function VisitaDetalleModal() {
   const { open, visita } = visitaView
   const confirmar = useConfirm()
   const alertar = useAlert()
+  const toast = useToast()
 
   const [deleting, setDeleting] = useState(false)
 
-  if (!open) return null
+  // Snapshot de la última visita no nula: al pedir el cierre, el contexto
+  // limpia "visita" a null en el mismo instante (antes de que termine la
+  // animación de salida del modal) — sin esto, el contenido saltaría a
+  // "No se encontró la visita" durante el fade en vez de mostrar la visita
+  // hasta que el modal termine de desaparecer.
+  const [visitaMostrada, setVisitaMostrada] = useState(visita)
+  useEffect(() => {
+    if (visita) setVisitaMostrada(visita)
+  }, [visita])
 
   // Visibilidad de campos condicionales (misma lógica que el formulario).
-  const vis = visita ? calcularVisibilidad(visita) : null
+  const vis = visitaMostrada ? calcularVisibilidad(visitaMostrada) : null
   const mostrarMedios = vis?.mediosBloque
   const mostrarDecoloracion = vis?.decoloracion
 
   const handleEditar = () => {
     closeVerVisita()
-    openEditarVisita(visita)
+    openEditarVisita(visitaMostrada)
   }
 
   const handleEliminar = async () => {
@@ -42,9 +53,10 @@ export default function VisitaDetalleModal() {
     if (!ok) return
     setDeleting(true)
     try {
-      await deleteVisita(visita.id)
+      await deleteVisita(visitaMostrada.id)
       refresh()
       closeVerVisita()
+      toast('Visita eliminada')
     } catch (err) {
       console.error('Error eliminando la visita:', err)
       await alertar('No se pudo eliminar. Revisá tu conexión e intentá de nuevo.')
@@ -54,94 +66,97 @@ export default function VisitaDetalleModal() {
 
   return (
     <Modal
+      open={open}
+      centered
       title="Detalle de la visita"
       onClose={closeVerVisita}
       footer={
         <>
           {/* Eliminar va al extremo izquierdo (btn--start) para no quedar
               pegado a las acciones principales y evitar taps accidentales. */}
-          {visita && (
+          {visitaMostrada && (
             <Button
               variant="danger"
               className="btn--start"
               onClick={handleEliminar}
               disabled={deleting}
             >
-              {deleting ? 'Eliminando…' : '🗑️ Eliminar'}
+              <Trash2 size={14} strokeWidth={2.25} />
+              {deleting ? 'Eliminando…' : 'Eliminar'}
             </Button>
           )}
           <Button variant="ghost" onClick={closeVerVisita}>
             Cerrar
           </Button>
-          {visita && (
+          {visitaMostrada && (
             <Button variant="primary" onClick={handleEditar} disabled={deleting}>
-              ✏️ Editar
+              <Pencil size={14} strokeWidth={2.25} />
+              Editar
             </Button>
           )}
         </>
       }
     >
-      {!visita ? (
+      {!visitaMostrada ? (
         <p className="muted">No se encontró la visita.</p>
       ) : (
         <>
           {/* Aplicación */}
-          <div className="card">
-            <div className="form-section-label">Aplicación</div>
+          <div className="card card--tight">
+            <h3 className="form-section-label">Aplicación</h3>
             <div className="dato-grid dato-grid--split">
-              <Dato label="Tipo de aplicación">{visita.tipoAplicacion}</Dato>
-              <Dato label="Fecha">{fmtFecha(visita.fecha)}</Dato>
+              <Dato label="Tipo de aplicación">{visitaMostrada.tipoAplicacion}</Dato>
+              <Dato label="% de canas">
+                {visitaMostrada.porcentajeCanas ? `${visitaMostrada.porcentajeCanas}%` : ''}
+              </Dato>
               {mostrarDecoloracion && (
-                <Dato label="Decoloración — etapa">{visita.decoloracionEtapa}</Dato>
+                <Dato label="Decoloración — etapa">{visitaMostrada.decoloracionEtapa}</Dato>
               )}
             </div>
           </div>
 
-          {/* Fórmula raíz (excepción: sin layout "en fila"; oxidante y tiempo
-              van juntos en la misma fila, en 2 columnas) */}
-          <div className="card">
-            <div className="form-section-label">Fórmula raíz</div>
-            <Dato label="Fórmula raíz">{visita.formulaRaiz}</Dato>
-            <div className="dato-grid dato-grid--pair" style={{ marginTop: 12 }}>
-              <Dato label="Oxidante raíz">{visita.oxidanteRaiz}</Dato>
-              <Dato label="Tiempo raíz">{visita.tiempoRaiz}</Dato>
+          {/* Fórmula raíz: fórmula + oxígeno + tiempo, los 3 en una fila */}
+          <div className="card card--tight">
+            <h3 className="form-section-label">Fórmula raíz</h3>
+            <div className="dato-grid--trio">
+              <Dato label="Fórmula raíz">{visitaMostrada.formulaRaiz}</Dato>
+              <Dato label="Oxigenta Vol">{visitaMostrada.oxidanteRaiz}</Dato>
+              <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
             </div>
           </div>
 
           {/* Fórmula medios a puntas (oculta para "Retoque de raíz"; misma excepción) */}
           {mostrarMedios && (
-            <div className="card">
-              <div className="form-section-label">Fórmula medios a puntas</div>
-              <Dato label="Fórmula medios a puntas">{visita.formulaMediosAPuntas}</Dato>
-              <div className="dato-grid dato-grid--pair" style={{ marginTop: 12 }}>
-                <Dato label="Oxidante medios a puntas">{visita.oxidanteMediosAPuntas}</Dato>
-                <Dato label="Tiempo medios a puntas">{visita.tiempoMediosAPuntas}</Dato>
+            <div className="card card--tight">
+              <h3 className="form-section-label">Fórmula medios a puntas</h3>
+              <div className="dato-grid--trio">
+                <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
+                <Dato label="Oxigenta">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
+                <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
               </div>
             </div>
           )}
 
           {/* Resultado y datos */}
-          <div className="card">
-            <div className="form-section-label">Resultado y datos</div>
+          <div className="card card--tight">
+            <h3 className="form-section-label">Resultado y datos</h3>
             <div className="dato-grid dato-grid--split">
-              {esAdmin && <Dato label="Precio">{fmtPrecio(visita.precio)}</Dato>}
-              <Dato label="Color obtenido">{visita.colorObtenido}</Dato>
-              <Dato label="Porcentaje de canas">
-                {visita.porcentajeCanas ? `${visita.porcentajeCanas}%` : ''}
-              </Dato>
-              <Dato label="Largo del cabello">{visita.largoCabello}</Dato>
+              {esAdmin && <Dato label="Precio">{fmtPrecio(visitaMostrada.precio)}</Dato>}
+              <Dato label="Color obtenido">{visitaMostrada.colorObtenido}</Dato>
+              <Dato label="Largo del cabello">{visitaMostrada.largoCabello}</Dato>
+              <Dato label="Fecha">{fmtFecha(visitaMostrada.fecha)}</Dato>
             </div>
             <div style={{ marginTop: 12 }}>
-              <Dato label="Nota">{visita.nota}</Dato>
+              <Dato label="Nota">{visitaMostrada.nota}</Dato>
             </div>
           </div>
 
           {/* Foto del resultado */}
-          <div className="card">
-            <div className="form-section-label">Foto del resultado</div>
-            {visita.fotoResultado ? (
+          <div className="card card--tight">
+            <h3 className="form-section-label">Foto del resultado</h3>
+            {visitaMostrada.fotoResultado ? (
               <div className="foto-preview">
-                <img className="foto-preview__img" src={visita.fotoResultado} alt="Resultado" />
+                <img className="foto-preview__img" src={visitaMostrada.fotoResultado} alt="Resultado" />
               </div>
             ) : (
               <p className="muted">Sin foto cargada.</p>

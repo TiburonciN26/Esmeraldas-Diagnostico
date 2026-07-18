@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { SessionProvider } from './context/SessionContext'
 import { AppProvider } from './context/AppContext'
 import { ConfirmProvider } from './context/ConfirmContext'
+import { ToastProvider } from './context/ToastContext'
 import LoginGate from './components/auth/LoginGate'
 import ErrorBoundary from './components/ErrorBoundary'
 import App from './App'
@@ -14,9 +15,11 @@ createRoot(document.getElementById('root')).render(
       <SessionProvider>
         <LoginGate>
           <ConfirmProvider>
-            <AppProvider>
-              <App />
-            </AppProvider>
+            <ToastProvider>
+              <AppProvider>
+                <App />
+              </AppProvider>
+            </ToastProvider>
           </ConfirmProvider>
         </LoginGate>
       </SessionProvider>

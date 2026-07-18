@@ -1,4 +1,4 @@
-import { Phone, Cake } from 'lucide-react'
+import { Phone, Cake, MessageCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { buildWhatsappLink } from '../../utils/whatsapp'
@@ -22,10 +22,26 @@ export default function ClienteCard({ cliente, onOpen }) {
     if (waLink) window.open(waLink, '_blank', 'noopener,noreferrer')
   }
 
+  const abrir = () => onOpen(cliente.id)
+
+  // La tarjeta entera es el disparador (no solo el texto), así que se
+  // expone como un botón real para teclado/lector de pantalla: sin esto,
+  // un div con onClick es completamente inoperable sin mouse.
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      abrir()
+    }
+  }
+
   return (
     <Card
       className={`cliente-card ${esCumple ? 'cliente-card--cumple' : ''}`}
-      onClick={() => onOpen(cliente.id)}
+      onClick={abrir}
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir ficha de ${cliente.nombreCompleto}`}
+      onKeyDown={handleKeyDown}
     >
       <div className="cliente-card__avatar">{iniciales(cliente.nombreCompleto)}</div>
 
@@ -52,7 +68,7 @@ export default function ClienteCard({ cliente, onOpen }) {
           disabled={!waLink}
           onClick={handleWhatsapp}
         >
-          💬
+          <MessageCircle size={16} strokeWidth={2.25} />
         </Button>
       </div>
     </Card>

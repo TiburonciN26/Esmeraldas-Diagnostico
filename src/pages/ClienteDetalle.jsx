@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Trash2, Pencil } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useSession } from '../context/SessionContext'
 import { useConfirm, useAlert } from '../context/ConfirmContext'
+import { useToast } from '../context/ToastContext'
 import { getClienteCompleto, deleteCliente } from '../services'
 import TopBar from '../components/layout/TopBar'
 import Card, { Dato } from '../components/ui/Card'
@@ -22,6 +24,7 @@ export default function ClienteDetalle() {
   const esAdmin = session?.rol === 'administrador'
   const confirmar = useConfirm()
   const alertar = useAlert()
+  const toast = useToast()
 
   const [cliente, setCliente] = useState(null)
   const [diagnostico, setDiagnostico] = useState(null)
@@ -71,6 +74,7 @@ export default function ClienteDetalle() {
       await deleteCliente(selectedClienteId)
       refresh()
       goHome()
+      toast('Cliente eliminado')
     } catch (err) {
       console.error('Error eliminando el cliente:', err)
       await alertar('No se pudo eliminar. Revisá tu conexión e intentá de nuevo.')
@@ -123,10 +127,12 @@ export default function ClienteDetalle() {
         right={
           <>
             <Button variant="danger" size="sm" onClick={handleDeleteCliente} disabled={deleting}>
-              {deleting ? 'Eliminando…' : '🗑️ Eliminar'}
+              <Trash2 size={14} strokeWidth={2.25} />
+              {deleting ? 'Eliminando…' : 'Eliminar'}
             </Button>
             <Button variant="ghost" size="sm" onClick={handleEditCliente}>
-              ✏️ Editar
+              <Pencil size={14} strokeWidth={2.25} />
+              Editar
             </Button>
           </>
         }
@@ -135,7 +141,7 @@ export default function ClienteDetalle() {
       {/* Tarjetas 1 y 2: cliente + diagnóstico (lado a lado en desktop) */}
       <div className="detalle-top-grid">
         <Card>
-          <div className="card__label">Datos del cliente</div>
+          <h2 className="card__label">Datos del cliente</h2>
           <div className="dato-grid dato-grid--split">
             <Dato label="Nombre completo">{cliente.nombreCompleto}</Dato>
             <Dato label="Teléfono">{cliente.telefono}</Dato>
@@ -144,7 +150,7 @@ export default function ClienteDetalle() {
         </Card>
 
         <Card>
-          <div className="card__label">Diagnóstico</div>
+          <h2 className="card__label">Diagnóstico</h2>
           {diagnostico ? (
             <div className="dato-grid dato-grid--split">
               <Dato label="Canas resistentes">{diagnostico.canasResistentes}</Dato>
@@ -176,27 +182,42 @@ export default function ClienteDetalle() {
             <table className="visitas-table">
               <thead>
                 <tr>
-                  <th>Tipo de aplicación</th>
-                  {esAdmin && <th>Precio</th>}
-                  <th>Fecha</th>
-                  <th className="col-desktop">Decoloración — etapa</th>
-                  <th className="col-desktop">Fórmula raíz</th>
-                  <th className="col-desktop">Oxidante raíz</th>
-                  <th className="col-desktop">Tiempo raíz</th>
-                  <th className="col-desktop">Fórmula medios a puntas</th>
-                  <th className="col-desktop">Oxidante medios a puntas</th>
-                  <th className="col-desktop">Tiempo medios a puntas</th>
-                  <th className="col-desktop">Color obtenido</th>
-                  <th className="col-desktop">% Canas</th>
-                  <th className="col-desktop">Largo</th>
-                  <th className="col-desktop">Nota</th>
-                  <th className="col-desktop">Foto</th>
+                  <th scope="col">Tipo de aplicación</th>
+                  {esAdmin && <th scope="col">Precio</th>}
+                  <th scope="col">Fecha</th>
+                  <th scope="col" className="col-desktop">Decoloración — etapa</th>
+                  <th scope="col" className="col-desktop">Fórmula raíz</th>
+                  <th scope="col" className="col-desktop">Oxidante raíz</th>
+                  <th scope="col" className="col-desktop">Tiempo raíz</th>
+                  <th scope="col" className="col-desktop">Fórmula medios a puntas</th>
+                  <th scope="col" className="col-desktop">Oxidante medios a puntas</th>
+                  <th scope="col" className="col-desktop">Tiempo medios a puntas</th>
+                  <th scope="col" className="col-desktop">Color obtenido</th>
+                  <th scope="col" className="col-desktop">% Canas</th>
+                  <th scope="col" className="col-desktop">Largo</th>
+                  <th scope="col" className="col-desktop">Nota</th>
+                  <th scope="col" className="col-desktop">Foto</th>
                 </tr>
               </thead>
               <tbody>
-                {visitas.map((v) => (
-                  <tr key={v.id} onClick={() => handleVerVisita(v)}>
-                    <td>{v.tipoAplicacion}</td>
+                {visitas.map((v, i) => (
+                  <tr
+                    key={v.id}
+                    onClick={() => handleVerVisita(v)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Ver visita del ${fmtFecha(v.fecha)}, ${v.tipoAplicacion}${i === 0 ? ' (última visita)' : ''}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleVerVisita(v)
+                      }
+                    }}
+                  >
+                    <td>
+                      {v.tipoAplicacion}
+                      {i === 0 && <span className="badge-ultima">Última</span>}
+                    </td>
                     {esAdmin && <td>{fmtPrecio(v.precio)}</td>}
                     <td>{fmtFecha(v.fecha)}</td>
                     <td className="col-desktop">{v.decoloracionEtapa}</td>
