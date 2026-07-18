@@ -9,8 +9,14 @@ import ClienteCard from '../components/clientes/ClienteCard'
 import Button from '../components/ui/Button'
 
 export default function Home() {
-  const { goDetalleCliente, clientes, clientesLoaded, clientesError, refresh, openNuevoCliente } =
-    useApp()
+  const {
+    goDetalleCliente,
+    clientes,
+    clientesLoaded,
+    clientesError,
+    reloadClientes,
+    openNuevoCliente,
+  } = useApp()
   const { session, logout } = useSession()
   const confirmar = useConfirm()
   const [busqueda, setBusqueda] = useState('')
@@ -104,7 +110,7 @@ export default function Home() {
         <div className="page-error">
           <div className="page-error__emoji">⚠️</div>
           <p>{loadError}</p>
-          <Button variant="ghost" onClick={refresh}>
+          <Button variant="ghost" onClick={reloadClientes}>
             Reintentar
           </Button>
         </div>

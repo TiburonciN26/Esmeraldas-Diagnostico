@@ -37,6 +37,7 @@ var SHEETS = {
 // ---------------------------------------------------------------------------
 
 function doGet(e) {
+  _resetCache_()
   try {
     var p = (e && e.parameter) || {}
 
@@ -65,6 +66,7 @@ var ACCIONES_ESCRITURA = {
 }
 
 function doPost(e) {
+  _resetCache_()
   try {
     // Importante: el frontend NO debe declarar Content-Type: application/json
     // en el fetch (eso dispara un preflight CORS que Apps Script no responde
@@ -135,28 +137,33 @@ function doPost(e) {
           var clienteData = soloCampos_(body.cliente || {}, 'cliente')
           var diagnosticoData = soloCampos_(body.diagnostico || {}, 'diagnostico')
           var clienteId = body.id
+          var clienteFinal, diagnosticoFinal
 
+          // updateRowById_/appendRow_ ya devuelven la fila final escrita
+          // (ver sus comentarios) — antes esto releía cliente y diagnóstico
+          // desde la hoja después de escribirlos, acá se arma la respuesta
+          // con lo que ya quedó en memoria.
           if (clienteId) {
-            updateRowById_(SHEETS.CLIENTE, clienteId, clienteData)
+            clienteFinal = updateRowById_(SHEETS.CLIENTE, clienteId, clienteData)
           } else {
             clienteId = newId_('c')
-            appendRow_(SHEETS.CLIENTE, mergeForce_(clienteData, { id: clienteId, activo: true }))
+            clienteFinal = appendRow_(
+              SHEETS.CLIENTE,
+              mergeForce_(clienteData, { id: clienteId, activo: true })
+            )
           }
 
           var diagExistente = findByField_(SHEETS.DIAGNOSTICO, 'clienteId', clienteId)[0]
           if (diagExistente) {
-            updateRowById_(SHEETS.DIAGNOSTICO, diagExistente.id, diagnosticoData)
+            diagnosticoFinal = updateRowById_(SHEETS.DIAGNOSTICO, diagExistente.id, diagnosticoData)
           } else {
-            appendRow_(
+            diagnosticoFinal = appendRow_(
               SHEETS.DIAGNOSTICO,
               mergeForce_(diagnosticoData, { id: newId_('d'), clienteId: clienteId })
             )
           }
 
-          result = {
-            cliente: findById_(SHEETS.CLIENTE, clienteId),
-            diagnostico: findByField_(SHEETS.DIAGNOSTICO, 'clienteId', clienteId)[0] || null,
-          }
+          result = { cliente: clienteFinal, diagnostico: diagnosticoFinal }
           break
         }
         case 'deleteCliente':
@@ -196,7 +203,10 @@ function doPost(e) {
           var conFotoUpdate = conFotoSubida_(data)
           var datosVisitaUpdate = soloCampos_(conFotoUpdate.data, 'visita')
           try {
-            updateRowById_(
+            // updateRowById_ ya devuelve la fila parcheada — evita releer
+            // la hoja de visitas entera solo para obtener lo que acabamos
+            // de escribir.
+            result = updateRowById_(
               SHEETS.VISITA,
               body.id,
               sanitizarEscrituraVisita_(datosVisitaUpdate, usuario)
@@ -205,7 +215,7 @@ function doPost(e) {
             borrarFotoSiExiste_(conFotoUpdate.fotoSubidaId)
             throw writeErr
           }
-          result = filtrarPrecio_(findById_(SHEETS.VISITA, body.id), usuario)
+          result = filtrarPrecio_(result, usuario)
           break
         }
         case 'deleteVisita':
@@ -264,15 +274,19 @@ function verificarUsuario_(correo, codigo) {
 }
 
 // La pestaña "usuario" se lee en CADA request (toda acción empieza
-// autenticando). Se cachea 30s para no pagar esa lectura de más una y otra
-// vez cuando el frontend dispara varias llamadas casi juntas. Si editás un
-// rol/código en la hoja, puede tardar hasta 30s en verse reflejado.
+// autenticando), así que es la que más se beneficia de un TTL largo — de
+// ahí que tenga su propia entrada de caché (clave "usuarios") en vez de
+// depender del TTL genérico de 60s de SHEET_CACHE_TTL_SEGUNDOS (ver
+// readAll_). 5 minutos porque los roles/contraseñas casi no cambian una vez
+// asignados (a diferencia de clientes/visitas, que se editan todo el
+// tiempo desde la app). Si editás un rol/código a mano en la hoja, puede
+// tardar hasta 5 min en verse reflejado.
 function usuariosCacheados_() {
   var cache = CacheService.getScriptCache()
   var cached = cache.get('usuarios')
   if (cached) return JSON.parse(cached)
   var usuarios = readAll_(SHEETS.USUARIO)
-  cache.put('usuarios', JSON.stringify(usuarios), 30)
+  cache.put('usuarios', JSON.stringify(usuarios), 300)
   return usuarios
 }
 
@@ -332,20 +346,49 @@ function soloActivo_(row) {
 // ---------------------------------------------------------------------------
 // Acceso genérico a las hojas
 //
-// Techo de escala: readAll_ trae la hoja ENTERA y filtra en memoria en cada
-// request (sin índices, sin paginado). Para un salón esto anda bien durante
-// años — recién se nota al acercarse a los ~2.000-3.000 registros en
-// "visita" (la hoja que más crece). Si en algún momento las lecturas se
-// sienten lentas otra vez y ese es el motivo, la solución es la misma que
-// ya se usa para "usuario" en usuariosCacheados_: cachear con
-// CacheService.getScriptCache() la hoja de lectura frecuente, invalidando
-// (cache.remove) en cada escritura correspondiente. No conviene adelantar
-// esa complejidad — la invalidación mal hecha muestra datos viejos, que es
-// peor que una lectura lenta — hasta que el volumen real lo justifique.
+// Techo de escala: readAll_ siempre trae la hoja ENTERA de Sheets en un
+// cache-miss y filtra en memoria (sin índices, sin paginado). Para un salón
+// esto anda bien durante años — recién se nota al acercarse a los
+// ~2.000-3.000 registros en "visita" (la hoja que más crece), que es
+// también donde el límite de 100KB por entrada de CacheService (ver
+// SHEET_CACHE_TTL_SEGUNDOS más abajo) empezaría a hacer que esa hoja ya no
+// entre en caché — guardarEnCacheDeHoja_ lo tolera (no cachea esa vuelta en
+// vez de romper la lectura), así que ese día simplemente se pierde el
+// beneficio de la caché para "visita", no la app entera.
 // ---------------------------------------------------------------------------
 
+// Dos niveles de caché para no pagar una lectura de hoja completa en cada
+// request:
+//   1. _readAllCache — en memoria, dura un solo request (la resetea
+//      _resetCache_ al entrar a doGet/doPost). Evita que una sola acción
+//      que toca la misma hoja más de una vez (p.ej. getClienteCompleto o
+//      guardarClienteCompleto) la relea dentro de esa misma ejecución.
+//   2. CacheService.getScriptCache() — persiste ENTRE requests distintos
+//      hasta SHEET_CACHE_TTL_SEGUNDOS, o hasta que una escritura la
+//      invalide (ver invalidarCache_). Este es el que realmente evita
+//      pagar la lectura de Sheets en cada request nuevo, no solo dentro
+//      del mismo. Como toda escritura pasa por invalidarCache_ (que borra
+//      la entrada al instante), un usuario nunca ve desactualizado su
+//      propio cambio; el TTL es solo un techo defensivo por si alguna vez
+//      se edita la hoja a mano por fuera de la app (ver README).
+var _ssCache = null
+var _readAllCache = {}
+var SHEET_CACHE_TTL_SEGUNDOS = 60
+
+function _resetCache_() {
+  _ssCache = null
+  _readAllCache = {}
+}
+
+// Invalida los dos niveles de caché de una hoja después de escribirla.
+function invalidarCache_(sheetName) {
+  delete _readAllCache[sheetName]
+  CacheService.getScriptCache().remove('sheet_' + sheetName)
+}
+
 function ss_() {
-  return SpreadsheetApp.openById(SPREADSHEET_ID)
+  if (!_ssCache) _ssCache = SpreadsheetApp.openById(SPREADSHEET_ID)
+  return _ssCache
 }
 
 function sheet_(name) {
@@ -354,26 +397,59 @@ function sheet_(name) {
   return sh
 }
 
+// Guarda "rows" en CacheService bajo la clave de "sheetName". Es
+// best-effort a propósito: si el JSON supera el límite de 100KB por entrada
+// de CacheService (u ocurre cualquier otro error de caché), no vale la pena
+// romper la lectura por esto — esa vuelta simplemente no queda cacheada
+// entre requests, pero la respuesta ya se armó igual.
+function guardarEnCacheDeHoja_(sheetName, rows) {
+  try {
+    CacheService.getScriptCache().put('sheet_' + sheetName, JSON.stringify(rows), SHEET_CACHE_TTL_SEGUNDOS)
+  } catch (e) {
+    // Nada más que hacer.
+  }
+}
+
 // Convierte cada fila (a partir de la 2) en un objeto {header: valor},
 // normalizando fechas (Date -> "YYYY-MM-DD") y "activo" (-> booleano real).
+// Los objetos devueltos nunca se mutan en el lugar (filtrarPrecio_ y afines
+// siempre copian), así que es seguro compartir las mismas referencias entre
+// varios callers del mismo request, y también reconstruirlos tal cual desde
+// JSON entre requests distintos (ver los dos niveles de caché arriba).
 function readAll_(sheetName) {
+  if (_readAllCache[sheetName]) return _readAllCache[sheetName]
+
+  try {
+    var cached = CacheService.getScriptCache().get('sheet_' + sheetName)
+    if (cached) {
+      var rowsCacheadas = JSON.parse(cached)
+      _readAllCache[sheetName] = rowsCacheadas
+      return rowsCacheadas
+    }
+  } catch (e) {
+    // Entrada de caché corrupta o inaccesible: seguir como si no hubiera.
+  }
+
   var sh = sheet_(sheetName)
   var values = sh.getDataRange().getValues()
-  if (values.length < 1) return []
-  var headers = values[0].map(String)
   var rows = []
-  for (var i = 1; i < values.length; i++) {
-    var row = values[i]
-    var vacia = row.every(function (c) {
-      return c === ''
-    })
-    if (vacia) continue
-    var obj = {}
-    for (var col = 0; col < headers.length; col++) {
-      obj[headers[col]] = normalizeValue_(headers[col], row[col])
+  if (values.length >= 1) {
+    var headers = values[0].map(String)
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i]
+      var vacia = row.every(function (c) {
+        return c === ''
+      })
+      if (vacia) continue
+      var obj = {}
+      for (var col = 0; col < headers.length; col++) {
+        obj[headers[col]] = normalizeValue_(headers[col], row[col])
+      }
+      rows.push(obj)
     }
-    rows.push(obj)
   }
+  _readAllCache[sheetName] = rows
+  guardarEnCacheDeHoja_(sheetName, rows)
   return rows
 }
 
@@ -398,6 +474,10 @@ function findById_(sheetName, id) {
   return findByField_(sheetName, 'id', id)[0] || null
 }
 
+// Escribe la fila nueva y devuelve el objeto ya escrito, con el mismo
+// formato que readAll_ (mismos headers, mismas normalizaciones) — antes
+// terminaba con un findById_ (relee la hoja entera) solo para devolver algo
+// que ya se tenía armado en memoria.
 function appendRow_(sheetName, obj) {
   var sh = sheet_(sheetName)
   var headers = sh
@@ -408,12 +488,19 @@ function appendRow_(sheetName, obj) {
     return Object.prototype.hasOwnProperty.call(obj, h) ? obj[h] : ''
   })
   sh.appendRow(row)
-  return findById_(sheetName, obj.id) || obj
+  invalidarCache_(sheetName)
+  var out = {}
+  for (var i = 0; i < headers.length; i++) {
+    out[headers[i]] = normalizeValue_(headers[i], row[i])
+  }
+  return out
 }
 
 // Escribe la fila entera con un solo setValues() (en vez de un setValue() por
 // columna modificada) — actualizar una visita llegaba a hacer hasta 17
-// llamadas individuales a la API de Sheets.
+// llamadas individuales a la API de Sheets. Devuelve la fila ya parcheada
+// (mismo formato que readAll_) para que el caller no tenga que volver a leer
+// la hoja para saber cómo quedó.
 function updateRowById_(sheetName, id, patch) {
   var sh = sheet_(sheetName)
   var values = sh.getDataRange().getValues()
@@ -431,7 +518,12 @@ function updateRowById_(sheetName, id, patch) {
         }
       }
       sh.getRange(i + 1, 1, 1, headers.length).setValues([row])
-      return true
+      invalidarCache_(sheetName)
+      var out = {}
+      for (var c2 = 0; c2 < headers.length; c2++) {
+        out[headers[c2]] = normalizeValue_(headers[c2], row[c2])
+      }
+      return out
     }
   }
   throw new Error('No se encontró la fila con id "' + id + '" en "' + sheetName + '".')

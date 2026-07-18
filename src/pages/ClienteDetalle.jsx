@@ -1,21 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useSession } from '../context/SessionContext'
 import { useConfirm, useAlert } from '../context/ConfirmContext'
 import { useToast } from '../context/ToastContext'
-import { getClienteCompleto, deleteCliente } from '../services'
+import { deleteCliente } from '../services'
 import TopBar from '../components/layout/TopBar'
 import Card, { Dato } from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { fmtPrecio, fmtFecha } from '../utils/format'
+import { fmtPrecio, fmtFecha, fotoThumbUrl } from '../utils/format'
 
 export default function ClienteDetalle() {
   const {
     selectedClienteId,
     goHome,
-    refreshTick,
-    refresh,
+    clienteDetalle,
+    reloadClienteDetalle,
+    aplicarClienteEliminado,
     openEditarCliente,
     openNuevaVisita,
     openVerVisita,
@@ -26,35 +27,8 @@ export default function ClienteDetalle() {
   const alertar = useAlert()
   const toast = useToast()
 
-  const [cliente, setCliente] = useState(null)
-  const [diagnostico, setDiagnostico] = useState(null)
-  const [visitas, setVisitas] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(null)
+  const { cliente, diagnostico, visitas, loading, error: loadError } = clienteDetalle
   const [deleting, setDeleting] = useState(false)
-
-  useEffect(() => {
-    let vivo = true
-    setLoading(true)
-    setLoadError(null)
-    getClienteCompleto(selectedClienteId)
-      .then(({ cliente: c, diagnostico: d, visitas: v }) => {
-        if (!vivo) return
-        setCliente(c)
-        setDiagnostico(d)
-        setVisitas(v)
-        setLoading(false)
-      })
-      .catch((err) => {
-        if (!vivo) return
-        console.error('Error cargando el cliente:', err)
-        setLoadError('No se pudo cargar la información del cliente.')
-        setLoading(false)
-      })
-    return () => {
-      vivo = false
-    }
-  }, [selectedClienteId, refreshTick])
 
   const handleEditCliente = () => openEditarCliente(selectedClienteId)
   // visitas ya viene ordenada por fecha descendente (visitasDeCliente_ en el
@@ -72,7 +46,7 @@ export default function ClienteDetalle() {
     setDeleting(true)
     try {
       await deleteCliente(selectedClienteId)
-      refresh()
+      aplicarClienteEliminado(selectedClienteId)
       goHome()
       toast('Cliente eliminado')
     } catch (err) {
@@ -98,7 +72,7 @@ export default function ClienteDetalle() {
         <div className="page-error">
           <div className="page-error__emoji">⚠️</div>
           <p>{loadError}</p>
-          <Button variant="ghost" onClick={refresh}>
+          <Button variant="ghost" onClick={reloadClienteDetalle}>
             Reintentar
           </Button>
         </div>
@@ -235,7 +209,12 @@ export default function ClienteDetalle() {
                     </td>
                     <td className="col-desktop col-foto">
                       {v.fotoResultado ? (
-                        <img className="col-foto__thumb" src={v.fotoResultado} alt="Resultado" />
+                        <img
+                          className="col-foto__thumb"
+                          src={fotoThumbUrl(v.fotoResultado, 128)}
+                          alt="Resultado"
+                          loading="lazy"
+                        />
                       ) : (
                         ''
                       )}

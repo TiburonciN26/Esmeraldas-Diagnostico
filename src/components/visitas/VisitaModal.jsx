@@ -36,7 +36,7 @@ const CAMPOS_PRECARGA = [
 ]
 
 export default function VisitaModal() {
-  const { visitaModal, closeVisitaModal, refresh } = useApp()
+  const { visitaModal, closeVisitaModal, aplicarVisitaGuardada } = useApp()
   const { session } = useSession()
   const esAdmin = session?.rol === 'administrador'
   const confirmar = useConfirm()
@@ -129,15 +129,15 @@ export default function VisitaModal() {
     const datos = sanitizar()
 
     try {
-      if (esEdicion) {
-        // Editar modifica ESA visita (no crea una nueva).
-        await updateVisita(visitaId, datos)
-      } else {
-        // Alta: siempre crea un registro nuevo (la última visita no se toca).
-        await createVisita(clienteId, datos)
-      }
+      // Editar modifica ESA visita; alta siempre crea un registro nuevo (la
+      // última visita no se toca). Ambas devuelven la fila final (con foto
+      // ya subida a Drive, precio filtrado por rol) — se aplica directo al
+      // estado en memoria, sin volver a pedir el cliente completo.
+      const visitaGuardada = esEdicion
+        ? await updateVisita(visitaId, datos)
+        : await createVisita(clienteId, datos)
 
-      refresh()
+      aplicarVisitaGuardada(visitaGuardada)
       closeVisitaModal()
       toast(esEdicion ? 'Visita actualizada' : 'Visita guardada')
     } catch (err) {
@@ -234,7 +234,7 @@ export default function VisitaModal() {
         </Field>
 
         {vis.oxidanteRaiz && (
-          <Field label="Oxigenta Vol" htmlFor="v-oraiz">
+          <Field label="Oxig. Vol" htmlFor="v-oraiz">
             <div className="field--cond">
               <AutoGrowInput
                 id="v-oraiz"
@@ -274,7 +274,7 @@ export default function VisitaModal() {
           </Field>
 
           {vis.oxidanteMedios && (
-            <Field label="Oxigenta" htmlFor="v-omed">
+            <Field label="Oxig.Vol" htmlFor="v-omed">
               <AutoGrowInput
                 id="v-omed"
                 minChars={6}

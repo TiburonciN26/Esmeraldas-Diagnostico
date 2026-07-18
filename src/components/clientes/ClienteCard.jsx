@@ -1,6 +1,7 @@
 import { Phone, Cake, MessageCircle } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
+import { useApp } from '../../context/AppContext'
 import { buildWhatsappLink } from '../../utils/whatsapp'
 import { esCumpleanosHoy } from '../../utils/date'
 
@@ -14,6 +15,7 @@ function iniciales(nombre = '') {
 // - Clic en el cuerpo -> onOpen (navega al detalle, donde viven Editar/Eliminar)
 // - Botón WhatsApp -> acción propia (con stopPropagation)
 export default function ClienteCard({ cliente, onOpen }) {
+  const { prefetchClienteDetalle } = useApp()
   const waLink = buildWhatsappLink(cliente.telefono)
   const esCumple = esCumpleanosHoy(cliente.fechaCumpleanos)
 
@@ -23,6 +25,11 @@ export default function ClienteCard({ cliente, onOpen }) {
   }
 
   const abrir = () => onOpen(cliente.id)
+
+  // pointerdown (dedo apoyado / botón apretado) llega bastante antes que el
+  // click que efectivamente navega — adelantar acá el pedido del detalle le
+  // gana ese tiempo a una request que tarda varios segundos.
+  const prefetch = () => prefetchClienteDetalle(cliente.id)
 
   // La tarjeta entera es el disparador (no solo el texto), así que se
   // expone como un botón real para teclado/lector de pantalla: sin esto,
@@ -38,6 +45,7 @@ export default function ClienteCard({ cliente, onOpen }) {
     <Card
       className={`cliente-card ${esCumple ? 'cliente-card--cumple' : ''}`}
       onClick={abrir}
+      onPointerDown={prefetch}
       role="button"
       tabIndex={0}
       aria-label={`Abrir ficha de ${cliente.nombreCompleto}`}

@@ -15,7 +15,7 @@ import { Dato } from '../ui/Card'
 // Se abre al hacer clic en el cuerpo de una fila de la tabla de visitas, que
 // ya trae el objeto completo (nada que pedirle al backend acá).
 export default function VisitaDetalleModal() {
-  const { visitaView, closeVerVisita, openEditarVisita, refresh } = useApp()
+  const { visitaView, closeVerVisita, openEditarVisita, aplicarVisitaEliminada } = useApp()
   const { session } = useSession()
   const esAdmin = session?.rol === 'administrador'
   const { open, visita } = visitaView
@@ -34,6 +34,14 @@ export default function VisitaDetalleModal() {
   useEffect(() => {
     if (visita) setVisitaMostrada(visita)
   }, [visita])
+
+  // Este componente nunca se desmonta (Modal solo lo oculta), así que sin
+  // esto "deleting" quedaba en true para siempre después de un borrado
+  // exitoso — al abrir la siguiente visita, sus botones Eliminar/Editar
+  // aparecían bloqueados como si esa OTRA visita se estuviera borrando.
+  useEffect(() => {
+    if (open) setDeleting(false)
+  }, [open])
 
   // Visibilidad de campos condicionales (misma lógica que el formulario).
   const vis = visitaMostrada ? calcularVisibilidad(visitaMostrada) : null
@@ -54,7 +62,7 @@ export default function VisitaDetalleModal() {
     setDeleting(true)
     try {
       await deleteVisita(visitaMostrada.id)
-      refresh()
+      aplicarVisitaEliminada(visitaMostrada.id, visitaMostrada.clienteId)
       closeVerVisita()
       toast('Visita eliminada')
     } catch (err) {
@@ -102,7 +110,7 @@ export default function VisitaDetalleModal() {
       ) : (
         <>
           {/* Aplicación */}
-          <div className="card card--tight">
+          <div className="detalle-section">
             <h3 className="form-section-label">Aplicación</h3>
             <div className="dato-grid dato-grid--split">
               <Dato label="Tipo de aplicación">{visitaMostrada.tipoAplicacion}</Dato>
@@ -116,29 +124,27 @@ export default function VisitaDetalleModal() {
           </div>
 
           {/* Fórmula raíz: fórmula + oxígeno + tiempo, los 3 en una fila */}
-          <div className="card card--tight">
-            <h3 className="form-section-label">Fórmula raíz</h3>
-            <div className="dato-grid--trio">
+          <div className="detalle-section">
+            <div className="dato-grid--trio" >
               <Dato label="Fórmula raíz">{visitaMostrada.formulaRaiz}</Dato>
-              <Dato label="Oxigenta Vol">{visitaMostrada.oxidanteRaiz}</Dato>
+              <Dato label="Oxig. Vol">{visitaMostrada.oxidanteRaiz}</Dato>
               <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
             </div>
           </div>
 
           {/* Fórmula medios a puntas (oculta para "Retoque de raíz"; misma excepción) */}
           {mostrarMedios && (
-            <div className="card card--tight">
-              <h3 className="form-section-label">Fórmula medios a puntas</h3>
+            <div className="detalle-section">
               <div className="dato-grid--trio">
                 <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
-                <Dato label="Oxigenta">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
+                <Dato label="Oxig. vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
                 <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
               </div>
             </div>
           )}
 
           {/* Resultado y datos */}
-          <div className="card card--tight">
+          <div className="detalle-section">
             <h3 className="form-section-label">Resultado y datos</h3>
             <div className="dato-grid dato-grid--split">
               {esAdmin && <Dato label="Precio">{fmtPrecio(visitaMostrada.precio)}</Dato>}
@@ -152,7 +158,7 @@ export default function VisitaDetalleModal() {
           </div>
 
           {/* Foto del resultado */}
-          <div className="card card--tight">
+          <div className="detalle-section">
             <h3 className="form-section-label">Foto del resultado</h3>
             {visitaMostrada.fotoResultado ? (
               <div className="foto-preview">

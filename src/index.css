@@ -332,11 +332,22 @@ button {
   border-color: var(--color-rosado-pastel);
 }
 
-/* 2px menos de padding en cada dirección — pedido puntual para las
-   tarjetas del modal de detalle de visita (no toca .card en el resto de
-   la app). */
-.card--tight {
-  padding: 14px;
+/* Reemplaza las tarjetas del modal de detalle de visita por una simple
+   línea divisora entre secciones — las tarjetas (con su padding + borde a
+   cada lado) le restaban ancho justo al contenido que más lo necesitaba
+   (las fórmulas), y en celulares chicos rompía a una segunda línea. */
+.detalle-section {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detalle-section:first-child {
+  padding-top: 0;
+}
+
+.detalle-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 /* Título de tarjeta (Detalle de cliente): más grande que las claves de
@@ -1006,7 +1017,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding: 14px 16px 4px;
+  padding: 14px 10px 4px;
 }
 
 .modal__title {
@@ -1031,7 +1042,7 @@ button {
 }
 
 .modal__body {
-  padding: 4px 16px 14px;
+  padding: 4px 10px 14px;
   overflow-y: auto;
 }
 
@@ -1039,7 +1050,7 @@ button {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  padding: 12px 16px;
+  padding: 12px 10px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -1205,7 +1216,7 @@ button {
 @media (min-width: 360px) {
   .form-row {
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 10px;
   }
 }
 
@@ -1227,7 +1238,7 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 14px;
+  gap: 10px;
 }
 
 /* Título de sección dentro de modales: debe dominar visualmente sobre

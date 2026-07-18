@@ -20,7 +20,7 @@ const FORM_VACIO = {
 }
 
 export default function ClienteModal() {
-  const { clienteModal, closeClienteModal, refresh } = useApp()
+  const { clienteModal, closeClienteModal, aplicarClienteGuardado } = useApp()
   const confirmar = useConfirm()
   const toast = useToast()
   const { open, clienteId } = clienteModal
@@ -123,8 +123,12 @@ export default function ClienteModal() {
     }
 
     try {
-      await guardarClienteCompleto(esEdicion ? clienteId : null, datosCliente, datosDiagnostico)
-      refresh()
+      const resultado = await guardarClienteCompleto(
+        esEdicion ? clienteId : null,
+        datosCliente,
+        datosDiagnostico
+      )
+      aplicarClienteGuardado(resultado)
       closeClienteModal()
       toast(esEdicion ? 'Cliente actualizado' : 'Cliente creado')
     } catch (err) {
