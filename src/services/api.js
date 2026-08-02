@@ -9,6 +9,20 @@ const BASE_URL =
 
 const TIMEOUT_MS = 30000
 
+// Mismo texto que tira el backend cuando verificarUsuario_ rechaza el correo
+// o la contraseña (ver Code.gs) — toda acción autenticada pasa por ahí, no
+// solo el login. Si esto aparece en una acción que NO es 'login', significa
+// que la sesión guardada ya no sirve (p.ej. le cambiaron la contraseña en la
+// hoja "usuario" mientras había sesión abierta en este dispositivo), no que
+// alguien tipeó mal un campo. SessionContext se suscribe acá para desloguear
+// automáticamente en ese caso, en vez de dejar a la usuaria viendo el mismo
+// error en cada acción sin salida clara.
+const MENSAJE_CREDENCIALES_INVALIDAS = 'Correo o contraseña incorrectos.'
+let onSesionInvalida = null
+export function setOnSesionInvalida(fn) {
+  onSesionInvalida = fn
+}
+
 function credenciales() {
   const s = getSession()
   return { correo: s?.correo ?? '', codigo: s?.codigo ?? '' }
@@ -55,7 +69,12 @@ async function apiRequest(action, body) {
   }
 
   const json = await res.json()
-  if (!json.ok) throw new Error(json.error || 'Error del servidor.')
+  if (!json.ok) {
+    if (action !== 'login' && json.error === MENSAJE_CREDENCIALES_INVALIDAS) {
+      onSesionInvalida?.()
+    }
+    throw new Error(json.error || 'Error del servidor.')
+  }
   return json.data
 }
 

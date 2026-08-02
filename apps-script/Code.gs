@@ -180,7 +180,17 @@ function doPost(e) {
           if (!soloActivo_(findById_(SHEETS.CLIENTE, body.clienteId))) {
             throw new Error('El cliente no existe o fue eliminado.')
           }
-          var idV = newId_('v')
+          // El frontend manda el id ya generado (ver visitasService.js) para
+          // que un reintento tras un timeout de red sea idempotente: si la
+          // escritura anterior en realidad sí se guardó (el timeout fue solo
+          // en la respuesta), esta vuelta encuentra la fila ya escrita y la
+          // devuelve tal cual, en vez de crear una visita duplicada.
+          var idV = body.id ? String(body.id) : newId_('v')
+          var yaExistente = body.id ? findById_(SHEETS.VISITA, idV) : null
+          if (yaExistente) {
+            result = filtrarPrecio_(yaExistente, usuario)
+            break
+          }
           var conFoto = conFotoSubida_(data)
           var datosVisita = soloCampos_(conFoto.data, 'visita')
           try {

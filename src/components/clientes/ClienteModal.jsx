@@ -3,24 +3,54 @@ import { useApp } from '../../context/AppContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
 import { getClienteById, getDiagnosticoByClienteId, guardarClienteCompleto } from '../../services'
-import { GROSOR_CABELLO, SI_NO } from '../../data/constants'
+import { GROSOR_CABELLO, SI_NO, MESES } from '../../data/constants'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
 import { Field, TextInput, Select, Segmented } from '../ui/Field'
 
-// Estado inicial del formulario (cliente + diagnóstico juntos).
+// Estado inicial del formulario (cliente + diagnóstico juntos). El
+// cumpleaños vive como diaCumpleanos/mesCumpleanos SUELTOS (no como un
+// fechaCumpleanos único derivado en cada tecleo) — si se derivara de un
+// solo campo, escribir el día mientras el mes todavía está vacío
+// reconstruiría una fecha inválida, la limpiaría a "", y en el siguiente
+// render el día tecleado desaparecería solo. Se arma la fecha ISO final
+// recién al guardar (ver armarCumpleanos).
 const FORM_VACIO = {
   nombreCompleto: '',
   telefono: '',
-  fechaCumpleanos: '',
+  diaCumpleanos: '',
+  mesCumpleanos: '',
   canasResistentes: 'No',
-  alisadoOKeratinaPrevia: 'No',
-  fechaAlisadoOKeratina: '',
   grosorCabello: 'Medio',
 }
 
+const OPCIONES_MES = MESES.map((nombre, i) => ({
+  value: String(i + 1).padStart(2, '0'),
+  label: nombre,
+}))
+
+// El cumpleaños solo pide día y mes (no se pregunta el año de nacimiento) —
+// se sigue guardando como fecha ISO completa (mismo campo/formato de
+// siempre, sin tocar el backend ni esCumpleanosHoy, que ya compara solo mes
+// y día) usando este año fijo de relleno, que nunca se muestra en pantalla.
+const ANIO_CUMPLE_RELLENO = '2000'
+
+// Extrae { dia, mes } (strings "DD"/"MM") de una fecha ISO. Si falta o no
+// matchea, ambos quedan vacíos (campos sin completar).
+function partesCumpleanos(iso) {
+  const m = String(iso || '').match(/^\d{4}-(\d{2})-(\d{2})/)
+  return m ? { mes: m[1], dia: m[2] } : { mes: '', dia: '' }
+}
+
+// Arma la fecha ISO a partir de día y mes sueltos. Si falta alguno, no hay
+// fecha completa todavía (el campo es opcional, así que esto es válido).
+function armarCumpleanos(dia, mes) {
+  if (!dia || !mes) return ''
+  return `${ANIO_CUMPLE_RELLENO}-${mes.padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+}
+
 export default function ClienteModal() {
-  const { clienteModal, closeClienteModal, aplicarClienteGuardado } = useApp()
+  const { clienteModal, closeClienteModal, aplicarClienteGuardado, clientes } = useApp()
   const confirmar = useConfirm()
   const toast = useToast()
   const { open, clienteId } = clienteModal
@@ -51,13 +81,13 @@ export default function ClienteModal() {
     Promise.all([getClienteById(clienteId), getDiagnosticoByClienteId(clienteId)])
       .then(([c, d]) => {
         if (!vivo) return
+        const { dia, mes } = partesCumpleanos(c?.fechaCumpleanos)
         const datos = {
           nombreCompleto: c?.nombreCompleto ?? '',
           telefono: c?.telefono ?? '',
-          fechaCumpleanos: c?.fechaCumpleanos ?? '',
+          diaCumpleanos: dia,
+          mesCumpleanos: mes,
           canasResistentes: d?.canasResistentes ?? 'No',
-          alisadoOKeratinaPrevia: d?.alisadoOKeratinaPrevia ?? 'No',
-          fechaAlisadoOKeratina: d?.fechaAlisadoOKeratina ?? '',
           grosorCabello: d?.grosorCabello ?? 'Medio',
         }
         setForm(datos)
@@ -89,12 +119,21 @@ export default function ClienteModal() {
     if (!form.nombreCompleto.trim()) e.nombreCompleto = 'El nombre es obligatorio.'
 
     const tel = form.telefono.trim()
-    if (tel) {
-      if (!/^[\d\s()+-]+$/.test(tel)) {
-        e.telefono = 'Solo números, espacios y + - ( ).'
-      } else if (tel.replace(/\D/g, '').length < 7) {
-        e.telefono = 'Parece incompleto.'
-      }
+    if (!tel) {
+      e.telefono = 'El teléfono es obligatorio.'
+    } else if (!/^[\d\s()+-]+$/.test(tel)) {
+      e.telefono = 'Solo números, espacios y + - ( ).'
+    } else if (tel.replace(/\D/g, '').length < 7) {
+      e.telefono = 'Parece incompleto.'
+    } else {
+      // Duplicado: comparamos solo los dígitos, para que "931 893667" y
+      // "931-893667" cuenten como el mismo número. Se excluye al propio
+      // cliente (si estamos editando) para no marcarse a sí mismo.
+      const telNormalizado = tel.replace(/\D/g, '')
+      const yaExiste = clientes.some(
+        (c) => c.id !== clienteId && String(c.telefono || '').replace(/\D/g, '') === telNormalizado
+      )
+      if (yaExiste) e.telefono = 'Ya hay un cliente con este teléfono.'
     }
 
     setErrors(e)
@@ -106,19 +145,13 @@ export default function ClienteModal() {
     setSaving(true)
     setSaveError(null)
 
-    // Si "alisado/keratina previa" es No, no guardamos la fecha.
-    const fechaAlisado =
-      form.alisadoOKeratinaPrevia === 'Sí' ? form.fechaAlisadoOKeratina : ''
-
     const datosCliente = {
       nombreCompleto: form.nombreCompleto.trim(),
       telefono: form.telefono.trim(),
-      fechaCumpleanos: form.fechaCumpleanos,
+      fechaCumpleanos: armarCumpleanos(form.diaCumpleanos, form.mesCumpleanos),
     }
     const datosDiagnostico = {
       canasResistentes: form.canasResistentes,
-      alisadoOKeratinaPrevia: form.alisadoOKeratinaPrevia,
-      fechaAlisadoOKeratina: fechaAlisado,
       grosorCabello: form.grosorCabello,
     }
 
@@ -174,7 +207,7 @@ export default function ClienteModal() {
           )}
 
           {/* Sección 1: datos del cliente */}
-          <div className="card card--accent">
+          <div className="card">
             <h3 className="form-section-label">Datos del cliente</h3>
 
             <Field
@@ -192,7 +225,7 @@ export default function ClienteModal() {
             </Field>
 
             <div className="form-row">
-              <Field label="Teléfono" htmlFor="f-tel" error={errors.telefono}>
+              <Field label="Teléfono" required htmlFor="f-tel" error={errors.telefono}>
                 <TextInput
                   id="f-tel"
                   type="tel"
@@ -202,19 +235,37 @@ export default function ClienteModal() {
                 />
               </Field>
 
-              <Field label="Fecha de cumpleaños" htmlFor="f-cumple">
-                <TextInput
-                  id="f-cumple"
-                  type="date"
-                  value={form.fechaCumpleanos}
-                  onChange={(e) => set('fechaCumpleanos', e.target.value)}
-                />
+              <Field label="Cumpleaños (día y mes)">
+                {/* Sin año a propósito — no se pregunta el año de
+                    nacimiento, solo día y mes (lo único que necesita el
+                    aviso de cumpleaños). */}
+                <div className="cumple-inputs">
+                  <TextInput
+                    id="f-cumple-dia"
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="31"
+                    placeholder="Día"
+                    aria-label="Día de cumpleaños"
+                    value={form.diaCumpleanos}
+                    onChange={(e) => set('diaCumpleanos', e.target.value)}
+                  />
+                  <Select
+                    id="f-cumple-mes"
+                    options={OPCIONES_MES}
+                    placeholder="Mes"
+                    aria-label="Mes de cumpleaños"
+                    value={form.mesCumpleanos}
+                    onChange={(e) => set('mesCumpleanos', e.target.value)}
+                  />
+                </div>
               </Field>
             </div>
           </div>
 
           {/* Sección 2: diagnóstico */}
-          <div className="card card--accent">
+          <div className="card">
             <h3 className="form-section-label">Diagnóstico</h3>
 
             <div className="form-row">
@@ -229,38 +280,15 @@ export default function ClienteModal() {
                 </div>
               </Field>
 
-              <Field label="Alisado o keratina previa">
-                <div>
-                  <Segmented
-                    name="Alisado o keratina previa"
-                    options={SI_NO}
-                    value={form.alisadoOKeratinaPrevia}
-                    onChange={(v) => set('alisadoOKeratinaPrevia', v)}
-                  />
-                </div>
-              </Field>
-            </div>
-
-            {/* Fecha condicional: solo si alisado/keratina previa === "Sí" */}
-            {form.alisadoOKeratinaPrevia === 'Sí' && (
-              <Field label="Fecha del alisado o keratina" htmlFor="f-alisado">
-                <TextInput
-                  id="f-alisado"
-                  type="date"
-                  value={form.fechaAlisadoOKeratina}
-                  onChange={(e) => set('fechaAlisadoOKeratina', e.target.value)}
+              <Field label="Grosor del cabello" htmlFor="f-grosor">
+                <Select
+                  id="f-grosor"
+                  options={GROSOR_CABELLO}
+                  value={form.grosorCabello}
+                  onChange={(e) => set('grosorCabello', e.target.value)}
                 />
               </Field>
-            )}
-
-            <Field label="Grosor del cabello" htmlFor="f-grosor">
-              <Select
-                id="f-grosor"
-                options={GROSOR_CABELLO}
-                value={form.grosorCabello}
-                onChange={(e) => set('grosorCabello', e.target.value)}
-              />
-            </Field>
+            </div>
           </div>
         </>
       )}

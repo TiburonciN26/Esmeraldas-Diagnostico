@@ -9,7 +9,7 @@ import logoUrl from '../../img/LOGOESMERALDAS.png'
 // No hay "olvidé mi contraseña": la reasigna el admin editando la pestaña
 // "usuario" directamente en la hoja.
 export default function LoginGate({ children }) {
-  const { session, login } = useSession()
+  const { session, login, motivoSalida } = useSession()
   const [correo, setCorreo] = useState('')
   const [codigo, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
@@ -51,9 +51,9 @@ export default function LoginGate({ children }) {
         </div>
         <p className="muted login-card__sub">Ingresá con tu correo y contraseña.</p>
 
-        {error && (
+        {(error || motivoSalida) && (
           <div className="form-error" role="alert">
-            {error}
+            {error || motivoSalida}
           </div>
         )}
 

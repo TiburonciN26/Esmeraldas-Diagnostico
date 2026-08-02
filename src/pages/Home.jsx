@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Search, LogOut, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { useSession } from '../context/SessionContext'
-import { useConfirm } from '../context/ConfirmContext'
 import { normalizarTexto } from '../utils/format'
 import TopBar from '../components/layout/TopBar'
 import ClienteCard from '../components/clientes/ClienteCard'
@@ -17,8 +15,6 @@ export default function Home() {
     reloadClientes,
     openNuevoCliente,
   } = useApp()
-  const { session, logout } = useSession()
-  const confirmar = useConfirm()
   const [busqueda, setBusqueda] = useState('')
 
   // La lista vive en AppContext (no acá) precisamente para que, al volver a
@@ -27,13 +23,6 @@ export default function Home() {
   const loadError = clientesLoaded ? null : clientesError
 
   const handleNuevo = () => openNuevoCliente()
-
-  // Confirmación para evitar cierres accidentales — el botón está en la
-  // esquina, justo donde caen los taps sin querer en un celular.
-  const handleLogout = async () => {
-    const ok = await confirmar('¿Cerrar sesión?')
-    if (ok) logout()
-  }
 
   const clientesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda.trim())
@@ -47,23 +36,7 @@ export default function Home() {
 
   return (
     <>
-      <TopBar
-        title="Clientes"
-        bigTitle
-        showLogo
-        right={
-          <Button
-            variant="ghost"
-            size="sm"
-            icon
-            title={session?.nombre ? `Salir (${session.nombre})` : 'Salir'}
-            aria-label="Cerrar sesión"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} strokeWidth={2.25} />
-          </Button>
-        }
-      />
+      <TopBar title="Clientes" bigTitle showLogo menu />
 
       {!loading && clientes.length > 0 && (
         <div className="search-bar">

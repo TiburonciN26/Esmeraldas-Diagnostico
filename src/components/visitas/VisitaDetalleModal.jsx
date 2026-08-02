@@ -45,8 +45,25 @@ export default function VisitaDetalleModal() {
 
   // Visibilidad de campos condicionales (misma lógica que el formulario).
   const vis = visitaMostrada ? calcularVisibilidad(visitaMostrada) : null
-  const mostrarMedios = vis?.mediosBloque
   const mostrarDecoloracion = vis?.decoloracion
+
+  // Qué fórmula(s) mostrar se decide mirando los datos guardados (qué
+  // campos tienen contenido), no el tipo de aplicación — VisitaModal.jsx
+  // ya se encarga de vaciar el lado que no corresponde al guardar (ver
+  // sanitizar() ahí), así que acá alcanza con esta regla simple para que
+  // convivan "Retoque de raíz" (solo raíz), "Medio a punta" (solo medios),
+  // "Baño de color" (raíz sola, medios sola, o una única para ambas) y el
+  // resto (raíz + medios, iguales o no) sin conocer nada de tipos.
+  const tieneFormulaRaiz = Boolean(visitaMostrada?.formulaRaiz?.trim())
+  const tieneFormulaMedios = Boolean(visitaMostrada?.formulaMediosAPuntas?.trim())
+  const formulasIguales =
+    tieneFormulaRaiz &&
+    tieneFormulaMedios &&
+    visitaMostrada?.formulaRaiz === visitaMostrada?.formulaMediosAPuntas &&
+    visitaMostrada?.oxidanteRaiz === visitaMostrada?.oxidanteMediosAPuntas &&
+    visitaMostrada?.tiempoRaiz === visitaMostrada?.tiempoMediosAPuntas
+  const soloMedios = tieneFormulaMedios && !tieneFormulaRaiz
+  const mostrarMediosAparte = tieneFormulaMedios && !soloMedios && !formulasIguales
 
   const handleEditar = () => {
     closeVerVisita()
@@ -123,17 +140,34 @@ export default function VisitaDetalleModal() {
             </div>
           </div>
 
-          {/* Fórmula raíz: fórmula + oxígeno + tiempo, los 3 en una fila */}
+          {/* Fórmula principal: medios a puntas si es la única cargada,
+              raíz en cualquier otro caso (su label cambia a "raíz y
+              puntas" cuando ambas coinciden) — fórmula + oxígeno +
+              tiempo, los 3 en una fila */}
           <div className="detalle-section">
-            <div className="dato-grid--trio" >
-              <Dato label="Fórmula raíz">{visitaMostrada.formulaRaiz}</Dato>
-              <Dato label="Oxig. Vol">{visitaMostrada.oxidanteRaiz}</Dato>
-              <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
+            <div className="dato-grid--trio">
+              {soloMedios ? (
+                <>
+                  <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
+                  <Dato label="Oxig. Vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
+                  <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
+                </>
+              ) : (
+                <>
+                  <Dato label={formulasIguales ? 'Fórmula (raíz y puntas)' : 'Fórmula raíz'}>
+                    {visitaMostrada.formulaRaiz}
+                  </Dato>
+                  <Dato label="Oxig. Vol">{visitaMostrada.oxidanteRaiz}</Dato>
+                  <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Fórmula medios a puntas (oculta para "Retoque de raíz"; misma excepción) */}
-          {mostrarMedios && (
+          {/* Fórmula medios a puntas como bloque APARTE — solo cuando de
+              verdad es distinta de la de raíz (no para "Retoque de raíz",
+              "Medio a punta", "Baño de color", ni fórmulas únicas). */}
+          {mostrarMediosAparte && (
             <div className="detalle-section">
               <div className="dato-grid--trio">
                 <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>

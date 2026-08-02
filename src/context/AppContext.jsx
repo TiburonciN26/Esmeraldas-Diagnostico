@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { getClientes, getClienteCompleto } from '../services'
+import { CLIENTES_CACHE_KEY } from '../services/session'
 
 // Contexto global de la app: maneja la navegación entre pantallas
 // (Home <-> Detalle de cliente) sin librería de routing, y el estado de
@@ -388,7 +389,8 @@ export function useApp() {
 }
 
 // ---- Caché local de la lista de clientes (localStorage) ----
-const CLIENTES_CACHE_KEY = 'esmeraldas_clientes_cache'
+// La clave vive en services/session.js (no acá) para que clearSession()
+// pueda borrarla al cerrar sesión sin depender de este archivo.
 
 function leerClientesCache_() {
   try {

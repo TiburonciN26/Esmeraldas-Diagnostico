@@ -24,8 +24,24 @@ export const visitaVacia = {
   fotoResultado: '',
 }
 
-export async function createVisita(clienteId, data) {
-  return apiPost('createVisita', { clienteId, data })
+// El id de una visita nueva se genera en el frontend (no en el backend) para
+// que un reintento tras un timeout de red sea idempotente: si el POST
+// anterior en realidad sí llegó a guardarse (el timeout fue solo esperando
+// la respuesta), el reintento manda el MISMO id y el backend detecta que esa
+// visita ya existe en vez de crear una duplicada — ver el comentario en
+// Code.gs, case 'createVisita'. El caller (VisitaModal) genera el id una
+// sola vez por visita nueva y lo reusa en todos los reintentos de ESE
+// guardado.
+export function generarIdVisita() {
+  const random =
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now()}${Math.random()}`.replace(/\D/g, '')
+  return `v_${random.slice(0, 10)}`
+}
+
+export async function createVisita(clienteId, id, data) {
+  return apiPost('createVisita', { clienteId, id, data })
 }
 
 export async function updateVisita(id, data) {

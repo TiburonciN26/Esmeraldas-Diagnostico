@@ -14,6 +14,13 @@
 
 const KEY = 'esmeraldas_session'
 
+// Caché de la lista de clientes (ver AppContext.jsx) — se declara acá, no
+// ahí, para que clearSession() pueda borrarla al cerrar sesión sin que
+// AppContext.jsx tenga que exponer nada. Sin esto, cerrar sesión en un
+// dispositivo compartido dejaba nombres y teléfonos de clientas legibles en
+// localStorage para quien use el navegador después.
+export const CLIENTES_CACHE_KEY = 'esmeraldas_clientes_cache'
+
 export function getSession() {
   try {
     const raw = localStorage.getItem(KEY)
@@ -29,4 +36,5 @@ export function setSession(session) {
 
 export function clearSession() {
   localStorage.removeItem(KEY)
+  localStorage.removeItem(CLIENTES_CACHE_KEY)
 }

@@ -11,7 +11,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: {
         name: 'Esmeraldas · Diagnóstico de Colorimetría',
-        short_name: 'Esmeraldas',
+        short_name: 'Esmeraldas Diagnóstico',
         description: 'Gestión de clientes y diagnóstico de colorimetría — Esmeraldas Salón & Spa.',
         lang: 'es',
         start_url: '.',

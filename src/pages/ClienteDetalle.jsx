@@ -8,7 +8,7 @@ import { deleteCliente } from '../services'
 import TopBar from '../components/layout/TopBar'
 import Card, { Dato } from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { fmtPrecio, fmtFecha, fotoThumbUrl } from '../utils/format'
+import { fmtPrecio, fmtFecha, fmtDiaMes, fotoThumbUrl } from '../utils/format'
 
 export default function ClienteDetalle() {
   const {
@@ -116,22 +116,18 @@ export default function ClienteDetalle() {
       <div className="detalle-top-grid">
         <Card>
           <h2 className="card__label">Datos del cliente</h2>
-          <div className="dato-grid dato-grid--split">
+          <div className="dato-grid dato-grid--split dato-grid--3up">
             <Dato label="Nombre completo">{cliente.nombreCompleto}</Dato>
             <Dato label="Teléfono">{cliente.telefono}</Dato>
-            <Dato label="Cumpleaños">{fmtFecha(cliente.fechaCumpleanos)}</Dato>
+            <Dato label="Cumpleaños">{fmtDiaMes(cliente.fechaCumpleanos)}</Dato>
           </div>
         </Card>
 
         <Card>
           <h2 className="card__label">Diagnóstico</h2>
           {diagnostico ? (
-            <div className="dato-grid dato-grid--split">
+            <div className="dato-grid dato-grid--split dato-grid--3up">
               <Dato label="Canas resistentes">{diagnostico.canasResistentes}</Dato>
-              <Dato label="Alisado/keratina previa">{diagnostico.alisadoOKeratinaPrevia}</Dato>
-              {diagnostico.alisadoOKeratinaPrevia === 'Sí' && (
-                <Dato label="Fecha alisado/keratina">{fmtFecha(diagnostico.fechaAlisadoOKeratina)}</Dato>
-              )}
               <Dato label="Grosor del cabello">{diagnostico.grosorCabello}</Dato>
             </div>
           ) : (

@@ -214,6 +214,70 @@ button {
   display: block;
 }
 
+/* ---------- Menú del header (hamburguesa) ---------- */
+.app-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Mismo tamaño/forma que .topbar__back para que ambos "íconos líder" del
+   header (volver / menú) se vean como parte de un mismo sistema, aunque no
+   aparecen juntos nunca (volver = drill-down, menú = raíz). */
+.app-menu__trigger {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.app-menu__trigger:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.app-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  min-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: field-in 0.15s ease;
+}
+
+.app-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.app-menu__item:hover {
+  background: var(--color-primary-soft);
+}
+
 /* ---------- Botones ---------- */
 .btn {
   border: 1.5px solid transparent;
@@ -326,12 +390,6 @@ button {
   margin-top: 14px;
 }
 
-/* Tarjeta con borde rosa pastel, para secciones que deben destacar
-   (ej. las tarjetas del modal de nuevo/editar cliente). */
-.card--accent {
-  border-color: var(--color-rosado-pastel);
-}
-
 /* Reemplaza las tarjetas del modal de detalle de visita por una simple
    línea divisora entre secciones — las tarjetas (con su padding + borde a
    cada lado) le restaban ancho justo al contenido que más lo necesitaba
@@ -406,29 +464,8 @@ button {
   color: #a6790a;
 }
 
-.cliente-card__avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 2px solid var(--color-rosado-pastel);
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  font-size: var(--fs-lg);
-}
-
-.cliente-card__info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .cliente-card__nombre {
+  flex: 1;
   min-width: 0;
   font-weight: 600;
   font-size: var(--fs-md);
@@ -609,6 +646,18 @@ button {
   }
 }
 
+/* Variante para tablet+: 3 columnas en vez de 2, usada solo en el Detalle
+   de cliente (Datos del cliente / Diagnóstico) — NO en .dato-grid a secas,
+   porque esa clase también la usa VisitaDetalleModal, cuyo ancho está
+   acotado por .modal (max-width: 560px) sin importar el viewport: forzar 3
+   columnas ahí en pantallas anchas apretaría el modal aunque su propio
+   ancho no haya crecido. */
+@media (min-width: 768px) {
+  .dato-grid--3up {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .dato {
   min-width: 0;
 }
@@ -627,13 +676,20 @@ button {
   word-break: break-word;
 }
 
-/* Variante "en fila": nombre del campo a la izquierda, dato a la derecha,
-   cada uno en un extremo (Detalle de cliente: Datos personales y Diagnóstico). */
+/* Variante "en fila": campo y dato juntos, pegados (no en los dos extremos
+   de la celda — con space-between quedaban separados por un hueco enorme
+   en pantallas anchas, sobre todo en tablet donde .dato-grid ya da bastante
+   ancho por celda). El "gap" chico es lo que controla la distancia entre
+   la etiqueta y su valor. */
 .dato-grid--split .dato {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.dato-grid--split .dato__k {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Variante "en par": 2 columnas fijas (sin breakpoint), para campos cortos
@@ -657,7 +713,7 @@ button {
 
 .dato-grid--split .dato__v {
   margin-top: 0;
-  text-align: right;
+  min-width: 0;
 }
 
 .card__header {
@@ -988,6 +1044,15 @@ button {
   }
 }
 
+/* Un poco más ancho desde tablet — menos margen desperdiciado a los
+   costados, y más lugar para las filas de fórmula (ver .input--ancho-
+   responsivo más abajo). */
+@media (min-width: 768px) {
+  .modal {
+    max-width: 640px;
+  }
+}
+
 /* Con el overlay centrado no queda pegado a ningún borde, así que
    redondea las 4 esquinas siempre (no solo desde el breakpoint de escritorio). */
 .modal--centered {
@@ -1063,11 +1128,24 @@ button {
   margin-bottom: 0;
 }
 
+.field__label-row {
+  margin-bottom: 6px;
+}
+
+/* Cuando el campo lleva algo extra en la fila de la etiqueta (ej. el
+   toggle Split/Merge de fórmulas en VisitaModal.jsx), ese algo va pegado
+   al otro extremo. */
+.field__label-row--extra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .field__label {
   display: block;
   font-size: var(--fs-sm);
   font-weight: 600;
-  margin-bottom: 6px;
   color: var(--color-text);
 }
 
@@ -1116,6 +1194,65 @@ button {
   max-width: 100%;
 }
 
+/* El campo Tiempo es type="number" (solo permite dígitos) dentro de un
+   AutoGrowInput angosto — las flechitas nativas de incrementar/decrementar
+   no entran en el ancho medido por el espejo (que no las contempla) y
+   recortan el número. Se ocultan: no hacen falta para escribir 1-3 dígitos
+   y así el campo se ve completo. */
+.autogrow .input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.autogrow .input[type='number']::-webkit-outer-spin-button,
+.autogrow .input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Variante de AutoGrowInput (ver anchoResponsivo en Field.jsx) para los
+   campos de fórmula (raíz/medios a puntas/completa): el mínimo de
+   caracteres llega como variable CSS en vez de fijo por inline style, así
+   se puede sumar unos caracteres más desde tablet sin tocar el mínimo en
+   celular. */
+.input--ancho-responsivo {
+  min-width: calc(var(--autogrow-min-chars, 10) * 1ch);
+}
+
+@media (min-width: 768px) {
+  .input--ancho-responsivo {
+    min-width: calc((var(--autogrow-min-chars, 10) + 5) * 1ch);
+  }
+}
+
+/* Variante "crecer" de AutoGrowInput (Fórmula raíz/medios a puntas/
+   completa): en vez de medirse por contenido, en tablet/desktop ocupa TODO
+   el espacio libre de .formula-row — es lo que hace que la fila no se vea
+   vacía cuando el resto de los campos (Oxígeno, Tiempo) son cortos a
+   propósito. El .field que lo contiene (no .autogrow directamente: el que
+   realmente es hijo flex de .formula-row es el .field, .autogrow queda
+   anidado adentro) es el que necesita flex-grow — se detecta con :has()
+   en vez de agregarle una prop de className a Field solo para esto.
+   El !important en el ancho del input hace falta porque AutoGrowInput fija
+   un "width" por JS en cada tecla (para el efecto de crecer con lo
+   escrito); acá se lo pisa a propósito, solo en este breakpoint, para que
+   en vez de "ancho = contenido" sea "ancho = 100% de lo que le tocó en el
+   flex". En celular no se toca nada (sigue midiéndose por contenido, que
+   es lo que hace falta cuando el espacio escasea). */
+@media (min-width: 768px) {
+  .formula-row .field:has(.autogrow--crece) {
+    flex: 1 1 240px;
+  }
+
+  .autogrow--crece {
+    display: block;
+    width: 100%;
+  }
+
+  .autogrow--crece .input {
+    width: 100% !important;
+  }
+}
+
 .autogrow__mirror {
   position: absolute;
   visibility: hidden;
@@ -1143,13 +1280,14 @@ button {
 }
 
 /* Select: se distingue claramente de un input de texto para que quede
-   claro que hay que elegir una opción — borde rosa pastel más grueso,
-   flecha propia y fondo tenue que se resalta al pasar el mouse. */
+   claro que hay que elegir una opción — flecha propia y fondo tenue que se
+   resalta al pasar el mouse (el borde ya no lleva color propio, usa el
+   mismo neutro que el resto de los campos). */
 .select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  border: 1.5px solid var(--color-rosado-pastel);
+  border: 1.5px solid var(--color-border);
   background-color: #fff5fa;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23141414' stroke-width='2.2'%3E%3Cpath d='M6 8l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -1160,13 +1298,92 @@ button {
 }
 
 .select:hover {
-  border-color: var(--color-rosado-pastel);
+  border-color: var(--color-border);
   background-color: #ffeaf5;
+}
+
+/* Select angosto para campos de valores cortos (% de canas) — sin esto
+   ocupan el 100% de su columna por más que el contenido más largo sea
+   "100%". Ancho fijo (no ch, para no bailar con el padding-right de la
+   flecha) alcanza para 4 caracteres + flecha en cualquier tamaño de
+   pantalla (tablet, móvil y desktop). */
+.select--corto {
+  width: auto;
+  min-width: 84px;
+  max-width: 92px;
+}
+
+/* Mientras la lista nativa de cualquier <select> de la app está
+   desplegada, oscurece y difumina TODO lo demás en pantalla — la lista
+   nativa del navegador siempre se dibuja por encima de cualquier capa de
+   la página sin importar z-index, así que queda como lo único nítido.
+   "select-activo" la pone/saca el propio componente Select (Field.jsx) en
+   mousedown/teclas de apertura -> blur/change, con limpieza al desmontar
+   (ver los comentarios ahí para el detalle de cada bug que motivó esto).
+   Es una regla genérica sobre el componente compartido, así que aplica a
+   cualquier select existente y a los que se agreguen a futuro sin tocar
+   nada más acá. */
+body.select-activo::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(20, 20, 20, 0.32);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: none;
 }
 
 .input--error,
 .select--error {
   border-color: var(--color-danger);
+}
+
+/* Envoltorio del <select> "Tipo de aplicación" + su toggle de modo de
+   fórmula (Split/Merge o los 3 íconos de "Baño de color") — van pegados
+   al control, no a la etiqueta: un título largo + íconos en la misma fila
+   que el texto rompía la fila en tablet/móvil/desktop; el <select> en
+   cambio se achica sin problema (el texto interno hace ellipsis). */
+.campo-con-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campo-con-toggle .select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Toggle Split/Merge junto a "Tipo de aplicación" (VisitaModal.jsx): elegir
+   fórmula distinta para raíz/medios a puntas, o una sola para todo el
+   cabello. Mismo lenguaje visual que .segmented (activo = fondo sólido). */
+.formula-modo-toggle {
+  display: inline-flex;
+  border: 1.5px solid var(--color-rosado-pastel);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.formula-modo-toggle__btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  border: none;
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  transition: background 0.15s, color 0.15s;
+}
+
+.formula-modo-toggle__btn + .formula-modo-toggle__btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.formula-modo-toggle__btn--activo {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .field__error {
@@ -1229,6 +1446,24 @@ button {
   }
 }
 
+/* Desde tablet, el segundo campo (ej. % de canas) ya está limitado por su
+   propio ancho fijo (.select--corto) — reservarle encima una fracción
+   proporcional (1fr) del grid dejaba un hueco vacío entre los dos campos.
+   "auto" lo ajusta a lo que él mismo necesita, y todo lo demás (1fr) queda
+   para el primer campo, que sí aprovecha el espacio de sobra. */
+@media (min-width: 768px) {
+  .form-row--2-1 {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+/* Si una fila queda con un solo campo visible (ej. "Fecha" sin "Precio"
+   para quien no es admin), que ocupe todo el ancho en vez de dejar la
+   segunda columna del grid vacía y en blanco. */
+.form-row > .field:only-child {
+  grid-column: 1 / -1;
+}
+
 /* Fórmula + oxígeno + tiempo en una sola fila — los 3 campos son
    AutoGrowInput (ver Field.jsx), así que a diferencia de .form-row (grid
    2 columnas 1fr 1fr) acá cada uno ocupa solo lo que necesita su propio
@@ -1239,6 +1474,23 @@ button {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 10px;
+}
+
+/* Día (input numérico angosto, 1-31) + Mes (select, ocupa el resto) del
+   cumpleaños — ver ClienteModal.jsx. */
+.cumple-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.cumple-inputs .input {
+  width: 4.5em;
+  flex-shrink: 0;
+}
+
+.cumple-inputs .select {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Título de sección dentro de modales: debe dominar visualmente sobre
@@ -1283,21 +1535,18 @@ button {
   margin-top: var(--sp-2);
 }
 
-.foto-input {
-  font-size: var(--fs-sm);
-  color: var(--color-text-soft);
-}
-
-/* Restylar el botón nativo del input de archivo (soportado en navegadores
-   modernos) en vez de reconstruirlo a mano con un <label> — así se
-   conserva gratis todo el comportamiento nativo de foco/teclado/lector de
-   pantalla del control real. */
-.foto-input::file-selector-button {
+/* El input real es .sr-only (oculto visualmente, sigue en el tab order) —
+   el botón visible es el <label> .foto-boton de abajo. Se dejó de restylar
+   el botón nativo (::file-selector-button) porque ese pseudo-elemento no
+   permite cambiar su TEXTO por CSS, y necesitamos que diga "Tomar foto" en
+   celular/tablet y "Seleccionar archivo" en desktop. */
+.foto-boton {
+  display: inline-flex;
+  align-items: center;
   font-family: inherit;
   font-size: var(--fs-sm);
   font-weight: 600;
   padding: 8px 14px;
-  margin-right: 10px;
   border: 1.5px solid var(--color-rosado-pastel);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -1306,8 +1555,33 @@ button {
   transition: background 0.15s, border-color 0.15s;
 }
 
-.foto-input::file-selector-button:hover {
+.foto-boton:hover {
   background: var(--color-primary-soft);
+}
+
+/* El input queda invisible pero sigue siendo el elemento que recibe foco
+   por teclado (es .sr-only, no display:none) — sin esto, tabular hasta acá
+   no mostraría ningún indicador visual de foco. */
+.foto-input:focus + .foto-boton {
+  outline: none;
+  border-color: var(--color-rosa-fuerte);
+  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.3);
+}
+
+.foto-boton__texto--desktop {
+  display: none;
+}
+
+/* pointer:fine = mouse (desktop/notebook, sin flujo de cámara directa).
+   pointer:coarse (dedo, celular/tablet) es el default de arriba, donde sí
+   tiene sentido invitar a "Tomar foto". */
+@media (pointer: fine) {
+  .foto-boton__texto--movil {
+    display: none;
+  }
+  .foto-boton__texto--desktop {
+    display: inline;
+  }
 }
 
 /* ---------- Login ---------- */

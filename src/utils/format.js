@@ -18,6 +18,17 @@ export function fmtFecha(iso) {
   return `${dia}/${mes}/${y}`
 }
 
+// Cumpleaños: solo importan día y mes (ver ClienteModal.jsx), el año que se
+// guarda es un valor de relleno sin significado — mostrarlo confundiría
+// ("¿de qué año es esto?"), así que acá se lo descarta a propósito.
+export function fmtDiaMes(iso) {
+  if (!iso) return ''
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return String(iso)
+  const [, , mes, dia] = m
+  return `${dia}/${mes}`
+}
+
 // Normaliza texto para búsquedas: minúsculas y sin tildes/diacríticos
 // (rango Unicode de combining marks U+0300–U+036F), de modo que "maria"
 // encuentre "María".
