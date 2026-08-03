@@ -65,6 +65,9 @@ export default function VisitaDetalleModal() {
   const soloMedios = tieneFormulaMedios && !tieneFormulaRaiz
   const mostrarMediosAparte = tieneFormulaMedios && !soloMedios && !formulasIguales
 
+  // "Sí"/"No" legible a partir del valor guardado ('si'/'no'/'').
+  const etiquetaAmonio = (valor) => (valor === 'si' ? 'Sí' : valor === 'no' ? 'No' : '')
+
   const handleEditar = () => {
     closeVerVisita()
     openEditarVisita(visitaMostrada)
@@ -151,6 +154,9 @@ export default function VisitaDetalleModal() {
                   <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
                   <Dato label="Oxig. Vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
                   <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
+                  <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
+                    {etiquetaAmonio(visitaMostrada.amonioMediosAPuntas)}
+                  </Dato>
                 </>
               ) : (
                 <>
@@ -159,6 +165,9 @@ export default function VisitaDetalleModal() {
                   </Dato>
                   <Dato label="Oxig. Vol">{visitaMostrada.oxidanteRaiz}</Dato>
                   <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
+                  <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
+                    {etiquetaAmonio(visitaMostrada.amonioRaiz)}
+                  </Dato>
                 </>
               )}
             </div>
@@ -173,6 +182,9 @@ export default function VisitaDetalleModal() {
                 <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
                 <Dato label="Oxig. vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
                 <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
+                <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
+                  {etiquetaAmonio(visitaMostrada.amonioMediosAPuntas)}
+                </Dato>
               </div>
             </div>
           )}

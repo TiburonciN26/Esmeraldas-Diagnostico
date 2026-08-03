@@ -134,16 +134,23 @@ export function TextArea({ className = '', ...props }) {
 // <select> nativo (Enter/Espacio, F4, Alt+Flecha — las flechas SOLAS no
 // entran a propósito, ver arriba).
 //
-// Cierra con "change" (cambió el valor) y "blur" (se fue el foco). Se
-// evaluó también cerrar con "click" (en teoría se dispara recién cuando la
-// lista nativa termina de cerrarse, cambie o no el valor — cubriría el caso
-// de reelegir la MISMA opción, que con solo "change" deja el difuminado
-// pegado hasta que el foco se vaya por otro lado) pero se descartó: no hay
-// forma confiable de comprobar que el navegador lo dispare recién al
-// cerrarse el desplegable nativo (que bloquea la página mientras está
-// abierto) en vez de al abrirlo, y arriesgar que el difuminado se apague
-// solo un instante después de abrirse es peor que dejar este caso puntual
-// sin resolver.
+// Cierra con "change" (cambió el valor) y "blur" (se fue el foco).
+//
+// Se probó también cerrar con "click", pensando que un <select> lo dispara
+// recién cuando la lista nativa termina de cerrarse (cubriría el caso de
+// reelegir la MISMA opción, que con "change" solo no dispara nada y deja el
+// difuminado pegado hasta que el foco se vaya por otro lado) — pero un
+// vistazo real (captura de pantalla en PC) mostró que estaba mal: "click"
+// se dispara junto con el "mousedown" que ABRE la lista, no cuando se
+// cierra (el mismo down+up que abre el desplegable ya cuenta como un click
+// normal sobre el <select>, sin importar qué lista nativa se despliegue
+// después). Con "click" agregado, el difuminado se apagaba antes de
+// llegar a pintarse — quedaba invisible SIEMPRE, un problema mucho peor que
+// el caso puntual que se quería tapar. Revertido: no hay forma 100%
+// confiable de detectar "la lista nativa se cerró" desde JS (ningún
+// navegador expone ese evento), así que reelegir la misma opción sigue
+// siendo un caso conocido sin resolver, mitigado por blur/change y por la
+// limpieza al desmontar de más abajo (que sí cubre el caso más grave).
 //
 // abiertoRef + el efecto de limpieza al desmontar arreglan el bug más serio:
 // si el <select> desaparece del DOM con la lista "abierta" según nuestro

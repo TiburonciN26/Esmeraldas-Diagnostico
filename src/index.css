@@ -1251,6 +1251,19 @@ button {
   .autogrow--crece .input {
     width: 100% !important;
   }
+
+  /* Campo "Oxig. Vol" (texto libre, ver VisitaModal.jsx): sin ancho fijo
+     quedaba tan ancho como Fórmula pese a llevar valores cortos ("20gr 20",
+     "1.2"). Achicado ~2 caracteres respecto de un ancho cómodo para ese
+     contenido — el espacio que libera lo absorbe Fórmula solo, gracias al
+     flex:1 de la regla de arriba. */
+  .formula-row .field:has(.input--corto) {
+    flex: 0 0 18ch;
+  }
+
+  .input--corto {
+    width: 100%;
+  }
 }
 
 .autogrow__mirror {
@@ -1319,7 +1332,9 @@ button {
    la página sin importar z-index, así que queda como lo único nítido.
    "select-activo" la pone/saca el propio componente Select (Field.jsx) en
    mousedown/teclas de apertura -> blur/change, con limpieza al desmontar
-   (ver los comentarios ahí para el detalle de cada bug que motivó esto).
+   (ver los comentarios ahí para el detalle de cada bug que motivó esto, y
+   por qué NO se cierra también con "click" — se probó y empeoraba las
+   cosas).
    Es una regla genérica sobre el componente compartido, así que aplica a
    cualquier select existente y a los que se agreguen a futuro sin tocar
    nada más acá. */
@@ -1384,6 +1399,45 @@ body.select-activo::after {
 .formula-modo-toggle__btn--activo {
   background: var(--color-primary);
   color: #fff;
+}
+
+/* "Amonio: Sí/No" junto al título de cada campo Fórmula (VisitaModal.jsx) —
+   2 checkboxes que se comportan como excluyentes (tildar uno destilda el
+   otro; tildar el ya tildado lo vuelve a dejar sin elegir) en vez de un
+   <select> o Segmented, porque así lo pidió el diseño. accent-color en vez
+   de reconstruir el checkbox a mano: alcanza para pintarlo del verde de la
+   marca (--accent-mint, el mismo que ya usa WhatsApp) al tildarse. */
+.amonio-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  color: var(--color-text-soft);
+}
+
+.amonio-toggle__label {
+  white-space: nowrap;
+}
+
+.amonio-toggle__opcion {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.amonio-toggle__opcion input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent-mint);
+  cursor: pointer;
+}
+
+.amonio-toggle--error .amonio-toggle__label {
+  color: var(--color-danger);
+  font-weight: 600;
 }
 
 .field__error {

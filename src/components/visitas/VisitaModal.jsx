@@ -30,14 +30,48 @@ const CAMPOS_PRECARGA = [
   'formulaRaiz',
   'oxidanteRaiz',
   'tiempoRaiz',
+  'amonioRaiz',
   'formulaMediosAPuntas',
   'oxidanteMediosAPuntas',
   'tiempoMediosAPuntas',
+  'amonioMediosAPuntas',
   'colorObtenido',
   'porcentajeCanas',
   'largoCabello',
   'precio',
 ]
+
+// Checkboxes "Sí"/"No" excluyentes para si la fórmula lleva amonio — van
+// pegados al título de cada campo Fórmula (ver labelExtra de Field), uno
+// por bloque de fórmula (raíz y medios a puntas tienen el suyo propio,
+// igual que ya pasa con Oxig. Vol y Tiempo). Clickear la opción ya marcada
+// la desmarca (vuelve a "sin elegir"), para poder corregir un clic
+// accidental sin tener que elegir la otra opción primero.
+function AmonioToggle({ valor, onChange, idBase, error }) {
+  return (
+    <div className={`amonio-toggle ${error ? 'amonio-toggle--error' : ''}`} role="group" aria-label="Amonio">
+      <span className="amonio-toggle__label">Amonio</span>
+      <label className="amonio-toggle__opcion" htmlFor={`${idBase}-amonio-si`}>
+        <input
+          type="checkbox"
+          id={`${idBase}-amonio-si`}
+          checked={valor === 'si'}
+          onChange={() => onChange(valor === 'si' ? '' : 'si')}
+        />
+        Sí
+      </label>
+      <label className="amonio-toggle__opcion" htmlFor={`${idBase}-amonio-no`}>
+        <input
+          type="checkbox"
+          id={`${idBase}-amonio-no`}
+          checked={valor === 'no'}
+          onChange={() => onChange(valor === 'no' ? '' : 'no')}
+        />
+        No
+      </label>
+    </div>
+  )
+}
 
 export default function VisitaModal() {
   const { visitaModal, closeVisitaModal, aplicarVisitaGuardada } = useApp()
@@ -158,6 +192,7 @@ export default function VisitaModal() {
   const campoFormula = modoSoloMedios ? 'formulaMediosAPuntas' : 'formulaRaiz'
   const campoOxidante = modoSoloMedios ? 'oxidanteMediosAPuntas' : 'oxidanteRaiz'
   const campoTiempo = modoSoloMedios ? 'tiempoMediosAPuntas' : 'tiempoRaiz'
+  const campoAmonio = modoSoloMedios ? 'amonioMediosAPuntas' : 'amonioRaiz'
   const idFormula = modoSoloMedios ? 'v-fmed' : 'v-fraiz'
   const idOxidante = modoSoloMedios ? 'v-omed' : 'v-oraiz'
   const idTiempo = modoSoloMedios ? 'v-tmed' : 'v-traiz'
@@ -256,6 +291,7 @@ export default function VisitaModal() {
     if (!form[campoFormula].trim()) e[campoFormula] = 'Este campo es obligatorio.'
     if (!form[campoOxidante].trim()) e[campoOxidante] = 'Este campo es obligatorio.'
     if (!form[campoTiempo].trim()) e[campoTiempo] = 'Este campo es obligatorio.'
+    if (!form[campoAmonio]) e[campoAmonio] = 'Elegí si lleva amonio.'
     // La fila de medios a puntas aparte solo se pide cuando de verdad hay
     // DOS bloques distintos en pantalla — con "fórmula única"/"Baño de
     // color" la de arriba ya cubre todo (sanitizar() la copia antes de
@@ -264,6 +300,7 @@ export default function VisitaModal() {
       if (!form.formulaMediosAPuntas.trim()) e.formulaMediosAPuntas = 'Este campo es obligatorio.'
       if (!form.oxidanteMediosAPuntas.trim()) e.oxidanteMediosAPuntas = 'Este campo es obligatorio.'
       if (!form.tiempoMediosAPuntas.trim()) e.tiempoMediosAPuntas = 'Este campo es obligatorio.'
+      if (!form.amonioMediosAPuntas) e.amonioMediosAPuntas = 'Elegí si lleva amonio.'
     }
     if (!form.colorObtenido) e.colorObtenido = 'Elegí el color obtenido.'
     if (!form.largoCabello) e.largoCabello = 'Elegí el largo del cabello.'
@@ -303,6 +340,7 @@ export default function VisitaModal() {
       limpio.formulaMediosAPuntas = ''
       limpio.oxidanteMediosAPuntas = ''
       limpio.tiempoMediosAPuntas = ''
+      limpio.amonioMediosAPuntas = ''
     } else if (modoSoloMedios) {
       // "Medio a punta", o "Baño de color" en modo "medios": la fila
       // principal cargó directo en los campos de medios a puntas (ver
@@ -310,6 +348,7 @@ export default function VisitaModal() {
       limpio.formulaRaiz = ''
       limpio.oxidanteRaiz = ''
       limpio.tiempoRaiz = ''
+      limpio.amonioRaiz = ''
     } else if (modoUnica) {
       // Una sola fórmula para todo el cabello: se guarda igual en ambos
       // lados, así la tabla y el detalle de la visita se ven exactamente
@@ -317,6 +356,7 @@ export default function VisitaModal() {
       limpio.formulaMediosAPuntas = limpio.formulaRaiz
       limpio.oxidanteMediosAPuntas = limpio.oxidanteRaiz
       limpio.tiempoMediosAPuntas = limpio.tiempoRaiz
+      limpio.amonioMediosAPuntas = limpio.amonioRaiz
     }
     return limpio
   }
@@ -438,7 +478,20 @@ export default function VisitaModal() {
           campos siguen siendo los de raíz). Los 3 en una fila y siempre
           visibles juntos (ya no se revelan a medida que se escribe). */}
       <div className="formula-row">
-        <Field label={labelFormula} required error={errors[campoFormula]} htmlFor={idFormula}>
+        <Field
+          label={labelFormula}
+          required
+          error={errors[campoFormula]}
+          htmlFor={idFormula}
+          labelExtra={
+            <AmonioToggle
+              valor={form[campoAmonio]}
+              onChange={(v) => set(campoAmonio, v)}
+              idBase={idFormula}
+              error={errors[campoAmonio]}
+            />
+          }
+        >
           <AutoGrowInput
             id={idFormula}
             minChars={15}
@@ -453,6 +506,7 @@ export default function VisitaModal() {
         <Field label="Oxig. Vol" required error={errors[campoOxidante]} htmlFor={idOxidante}>
           <TextInput
             id={idOxidante}
+            className="input--corto"
             value={form[campoOxidante]}
             error={errors[campoOxidante]}
             onChange={(e) => set(campoOxidante, e.target.value)}
@@ -485,6 +539,14 @@ export default function VisitaModal() {
             required
             error={errors.formulaMediosAPuntas}
             htmlFor="v-fmed"
+            labelExtra={
+              <AmonioToggle
+                valor={form.amonioMediosAPuntas}
+                onChange={(v) => set('amonioMediosAPuntas', v)}
+                idBase="v-fmed-aparte"
+                error={errors.amonioMediosAPuntas}
+              />
+            }
           >
             <AutoGrowInput
               id="v-fmed"
@@ -500,6 +562,7 @@ export default function VisitaModal() {
           <Field label="Oxig. Vol" required error={errors.oxidanteMediosAPuntas} htmlFor="v-omed">
             <TextInput
               id="v-omed"
+              className="input--corto"
               value={form.oxidanteMediosAPuntas}
               error={errors.oxidanteMediosAPuntas}
               onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
