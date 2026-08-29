@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { useSession } from '../context/SessionContext'
 import { useConfirm, useAlert } from '../context/ConfirmContext'
 import { useToast } from '../context/ToastContext'
 import { deleteCliente } from '../services'
 import TopBar from '../components/layout/TopBar'
 import Card, { Dato } from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { fmtPrecio, fmtFecha, fmtDiaMes, fotoThumbUrl } from '../utils/format'
+import { fmtFecha, fmtDiaMes } from '../utils/format'
 
 export default function ClienteDetalle() {
   const {
@@ -21,8 +20,6 @@ export default function ClienteDetalle() {
     openNuevaVisita,
     openVerVisita,
   } = useApp()
-  const { session } = useSession()
-  const esAdmin = session?.rol === 'administrador'
   const confirmar = useConfirm()
   const alertar = useAlert()
   const toast = useToast()
@@ -59,7 +56,7 @@ export default function ClienteDetalle() {
   if (loading) {
     return (
       <>
-        <TopBar title="Cliente" onBack={goHome} />
+        <TopBar title="Cliente" onBack={goHome} menu />
         <div className="loading">Cargando…</div>
       </>
     )
@@ -68,7 +65,7 @@ export default function ClienteDetalle() {
   if (loadError) {
     return (
       <>
-        <TopBar title="Cliente" onBack={goHome} />
+        <TopBar title="Cliente" onBack={goHome} menu />
         <div className="page-error">
           <div className="page-error__emoji">⚠️</div>
           <p>{loadError}</p>
@@ -83,7 +80,7 @@ export default function ClienteDetalle() {
   if (!cliente) {
     return (
       <>
-        <TopBar title="Cliente" onBack={goHome} />
+        <TopBar title="Cliente" onBack={goHome} menu />
         <div className="empty">
           <div className="empty__emoji">🤔</div>
           <p>No se encontró el cliente.</p>
@@ -98,15 +95,22 @@ export default function ClienteDetalle() {
         title={cliente.nombreCompleto}
         subtitle="Detalle de cliente"
         onBack={goHome}
+        menu
         right={
           <>
-            <Button variant="danger" size="sm" onClick={handleDeleteCliente} disabled={deleting}>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDeleteCliente}
+              disabled={deleting}
+              aria-label={deleting ? 'Eliminando…' : 'Eliminar'}
+            >
               <Trash2 size={14} strokeWidth={2.25} />
-              {deleting ? 'Eliminando…' : 'Eliminar'}
+              <span className="btn__texto">{deleting ? 'Eliminando…' : 'Eliminar'}</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={handleEditCliente}>
+            <Button variant="ghost" size="sm" onClick={handleEditCliente} aria-label="Editar">
               <Pencil size={14} strokeWidth={2.25} />
-              Editar
+              <span className="btn__texto">Editar</span>
             </Button>
           </>
         }
@@ -149,24 +153,15 @@ export default function ClienteDetalle() {
           <p className="muted">Este cliente todavía no tiene visitas registradas.</p>
         ) : (
           <div className="visitas-wrap">
+            {/* Solo lo esencial para escanear el historial de un vistazo —
+                el resto (fórmulas, oxidante, tiempo, precio, nota, foto…)
+                se ve al abrir la visita (handleVerVisita). */}
             <table className="visitas-table">
               <thead>
                 <tr>
                   <th scope="col">Tipo de aplicación</th>
-                  {esAdmin && <th scope="col">Precio</th>}
                   <th scope="col">Fecha</th>
-                  <th scope="col" className="col-desktop">Decoloración — etapa</th>
-                  <th scope="col" className="col-desktop">Fórmula raíz</th>
-                  <th scope="col" className="col-desktop">Oxidante raíz</th>
-                  <th scope="col" className="col-desktop">Tiempo raíz</th>
-                  <th scope="col" className="col-desktop">Fórmula medios a puntas</th>
-                  <th scope="col" className="col-desktop">Oxidante medios a puntas</th>
-                  <th scope="col" className="col-desktop">Tiempo medios a puntas</th>
-                  <th scope="col" className="col-desktop">Color obtenido</th>
-                  <th scope="col" className="col-desktop">% Canas</th>
-                  <th scope="col" className="col-desktop">Largo</th>
-                  <th scope="col" className="col-desktop">Nota</th>
-                  <th scope="col" className="col-desktop">Foto</th>
+                  <th scope="col">Color obtenido</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,33 +183,8 @@ export default function ClienteDetalle() {
                       {v.tipoAplicacion}
                       {i === 0 && <span className="badge-ultima">Última</span>}
                     </td>
-                    {esAdmin && <td>{fmtPrecio(v.precio)}</td>}
                     <td>{fmtFecha(v.fecha)}</td>
-                    <td className="col-desktop">{v.decoloracionEtapa}</td>
-                    <td className="col-desktop">{v.formulaRaiz}</td>
-                    <td className="col-desktop">{v.oxidanteRaiz}</td>
-                    <td className="col-desktop">{v.tiempoRaiz}</td>
-                    <td className="col-desktop">{v.formulaMediosAPuntas}</td>
-                    <td className="col-desktop">{v.oxidanteMediosAPuntas}</td>
-                    <td className="col-desktop">{v.tiempoMediosAPuntas}</td>
-                    <td className="col-desktop">{v.colorObtenido}</td>
-                    <td className="col-desktop">{v.porcentajeCanas ? `${v.porcentajeCanas}%` : ''}</td>
-                    <td className="col-desktop">{v.largoCabello}</td>
-                    <td className="col-desktop col-nota" title={v.nota}>
-                      {v.nota}
-                    </td>
-                    <td className="col-desktop col-foto">
-                      {v.fotoResultado ? (
-                        <img
-                          className="col-foto__thumb"
-                          src={fotoThumbUrl(v.fotoResultado, 128)}
-                          alt="Resultado"
-                          loading="lazy"
-                        />
-                      ) : (
-                        ''
-                      )}
-                    </td>
+                    <td>{v.colorObtenido}</td>
                   </tr>
                 ))}
               </tbody>

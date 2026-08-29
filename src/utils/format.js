@@ -38,13 +38,3 @@ export function normalizarTexto(s) {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 }
-
-// urlDeFoto_ (backend, Code.gs) guarda las fotos como
-// ".../thumbnail?id=...&sz=w1280" — ese tamaño está pensado para el detalle
-// a pantalla completa, no para una miniatura de ~40px en una tabla. Reescribe
-// el parámetro "sz" al tamaño pedido; deja cualquier otra URL (data URL local
-// todavía sin subir, o algo que no matchee) tal cual.
-export function fotoThumbUrl(url, size) {
-  if (!url) return url
-  return String(url).replace(/sz=w\d+/, `sz=w${size}`)
-}

@@ -11,17 +11,22 @@ export const visitaVacia = {
   decoloracionEtapa: '',
   formulaRaiz: '',
   oxidanteRaiz: '',
+  onzasRaiz: '',
   tiempoRaiz: '',
   amonioRaiz: '',
   formulaMediosAPuntas: '',
   oxidanteMediosAPuntas: '',
+  onzasMediosAPuntas: '',
   tiempoMediosAPuntas: '',
   amonioMediosAPuntas: '',
   fecha: '',
   precio: '',
   nota: '',
   colorObtenido: '',
-  porcentajeCanas: '',
+  // '0' (no '') así una visita nueva sin historial previo arranca en 0%
+  // en vez de forzar a elegir algo en el select — la mayoría de las
+  // clientas no tiene canas, así que es el caso más común.
+  porcentajeCanas: '0',
   largoCabello: '',
   fotoResultado: '',
 }

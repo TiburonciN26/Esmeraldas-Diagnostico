@@ -17,9 +17,9 @@
 // hay un límite de intentos fallidos por correo para dificultar la fuerza
 // bruta (ver verificarUsuario_).
 //
-// Rol "administrador": ve todo, incluido el precio de las visitas.
-// Rol "usuario": ve todo excepto el campo "precio" (se lo quitamos de la
-// respuesta antes de enviarla, no solo lo ocultamos en el frontend).
+// Rol "administrador" vs "usuario": ambos ven y cargan exactamente los
+// mismos campos de una visita, precio incluido — no hay datos restringidos
+// por rol en esta app.
 // ============================================================================
 
 // TODO: reemplazar por el ID real si alguna vez cambia la hoja.
@@ -118,9 +118,7 @@ function doPost(e) {
           result = {
             cliente: clienteCompleto,
             diagnostico: findByField_(SHEETS.DIAGNOSTICO, 'clienteId', body.id)[0] || null,
-            visitas: visitasDeCliente_(body.id).map(function (v) {
-              return filtrarPrecio_(v, usuario)
-            }),
+            visitas: visitasDeCliente_(body.id),
           }
           break
         }
@@ -176,6 +174,16 @@ function doPost(e) {
         // URL, así crear/editar una visita con foto nueva es un solo
         // request en vez de subir la foto aparte y recién después guardar
         // la visita.
+        // Las 3 acciones de acá abajo devuelven { visita, cliente } (o solo
+        // "cliente" para el borrado) en vez de la visita sola — cualquier
+        // alta/edición/baja de una visita puede cambiar qué tipos de
+        // aplicación tiene ese cliente (agregar uno nuevo, o hacer que ya no
+        // tenga ninguna con el tipo que se acaba de borrar/editar), así que
+        // junto con la visita se manda también la fila de "cliente" ya
+        // actualizada con su "tiposAplicados" recalculado (ver
+        // actualizarTiposDeCliente_ más abajo) — el frontend la aplica
+        // directo a la lista de Home (filtro por tipo), sin tener que
+        // recargarla entera para verlo.
         case 'createVisita': {
           if (!soloActivo_(findById_(SHEETS.CLIENTE, body.clienteId))) {
             throw new Error('El cliente no existe o fue eliminado.')
@@ -188,15 +196,16 @@ function doPost(e) {
           var idV = body.id ? String(body.id) : newId_('v')
           var yaExistente = body.id ? findById_(SHEETS.VISITA, idV) : null
           if (yaExistente) {
-            result = filtrarPrecio_(yaExistente, usuario)
+            result = { visita: yaExistente, cliente: findById_(SHEETS.CLIENTE, body.clienteId) }
             break
           }
           var conFoto = conFotoSubida_(data)
           var datosVisita = soloCampos_(conFoto.data, 'visita')
+          var visitaCreada
           try {
-            result = appendRow_(
+            visitaCreada = appendRow_(
               SHEETS.VISITA,
-              mergeForce_(sanitizarEscrituraVisita_(datosVisita, usuario), {
+              mergeForce_(datosVisita, {
                 id: idV,
                 clienteId: body.clienteId,
                 activo: true,
@@ -206,32 +215,33 @@ function doPost(e) {
             borrarFotoSiExiste_(conFoto.fotoSubidaId)
             throw writeErr
           }
-          result = filtrarPrecio_(result, usuario)
+          result = { visita: visitaCreada, cliente: actualizarTiposDeCliente_(body.clienteId) }
           break
         }
         case 'updateVisita': {
           var conFotoUpdate = conFotoSubida_(data)
           var datosVisitaUpdate = soloCampos_(conFotoUpdate.data, 'visita')
+          var visitaActualizada
           try {
             // updateRowById_ ya devuelve la fila parcheada — evita releer
             // la hoja de visitas entera solo para obtener lo que acabamos
             // de escribir.
-            result = updateRowById_(
-              SHEETS.VISITA,
-              body.id,
-              sanitizarEscrituraVisita_(datosVisitaUpdate, usuario)
-            )
+            visitaActualizada = updateRowById_(SHEETS.VISITA, body.id, datosVisitaUpdate)
           } catch (writeErr) {
             borrarFotoSiExiste_(conFotoUpdate.fotoSubidaId)
             throw writeErr
           }
-          result = filtrarPrecio_(result, usuario)
+          result = {
+            visita: visitaActualizada,
+            cliente: actualizarTiposDeCliente_(visitaActualizada.clienteId),
+          }
           break
         }
-        case 'deleteVisita':
-          updateRowById_(SHEETS.VISITA, body.id, { activo: false })
-          result = true
+        case 'deleteVisita': {
+          var visitaBorrada = updateRowById_(SHEETS.VISITA, body.id, { activo: false })
+          result = { cliente: actualizarTiposDeCliente_(visitaBorrada.clienteId) }
           break
+        }
 
         default:
           throw new Error('Acción desconocida: ' + body.action)
@@ -300,32 +310,6 @@ function usuariosCacheados_() {
   return usuarios
 }
 
-// Devuelve una copia de obj sin la clave "precio", salvo que el usuario sea
-// administrador (ahí se devuelve tal cual). Compartida por filtrarPrecio_
-// (lecturas) y sanitizarEscrituraVisita_ (escrituras) — antes cada una
-// repetía el mismo loop por separado.
-function sinPrecioSiNoAdmin_(obj, usuario) {
-  if (usuario.rol === 'administrador') return obj
-  var copia = {}
-  for (var k in obj) {
-    if (k !== 'precio') copia[k] = obj[k]
-  }
-  return copia
-}
-
-// Le saca el campo "precio" a una visita si quien pregunta no es admin.
-function filtrarPrecio_(visita, usuario) {
-  if (!visita) return visita
-  return sinPrecioSiNoAdmin_(visita, usuario)
-}
-
-// Igual que filtrarPrecio_ pero para lo que llega en un create/update: si no
-// es admin, el precio no se guarda aunque lo mande en el payload (si no, un
-// "usuario" podría colar un precio a mano aunque nunca pueda leerlos).
-function sanitizarEscrituraVisita_(data, usuario) {
-  return sinPrecioSiNoAdmin_(data, usuario)
-}
-
 function visitasDeCliente_(clienteId) {
   return findByField_(SHEETS.VISITA, 'clienteId', clienteId)
     .filter(function (v) {
@@ -334,6 +318,36 @@ function visitasDeCliente_(clienteId) {
     .sort(function (a, b) {
       return String(b.fecha || '').localeCompare(String(a.fecha || ''))
     })
+}
+
+// Recalcula desde cero (no se "resta"/"suma" incrementalmente, para estar
+// bien ante cualquier orden de altas/ediciones/bajas) la lista de tipos de
+// aplicación DISTINTOS entre todas las visitas activas del cliente, y la
+// guarda en su fila, columna "tiposAplicados" (texto separado por comas,
+// ej. "Rayitos,Retoque de raíz" — ningún tipo de TIPOS_APLICACION lleva
+// coma, así que separar por "," es seguro). Filtro por tipo en Home.jsx:
+// se calcula acá (al escribir una visita), no al leer la lista de
+// clientes, a propósito — así ese filtro no paga el costo de recorrer TODA
+// la hoja "visita" (la que más crece con el tiempo) en cada carga de Home,
+// solo la porción de un cliente puntual, en el momento en que ya se está
+// escribiendo su visita de todos modos.
+//
+// Si "tiposAplicados" todavía no existe como columna en la pestaña
+// "cliente", updateRowById_ simplemente no la escribe en ningún lado
+// (mismo comportamiento que cualquier otro campo whitelisteado sin columna
+// real), sin romper nada.
+function actualizarTiposDeCliente_(clienteId) {
+  var visitas = visitasDeCliente_(clienteId) // ya ordenadas por fecha desc
+  var vistos = {}
+  var tipos = []
+  for (var i = 0; i < visitas.length; i++) {
+    var tipo = visitas[i].tipoAplicacion
+    if (tipo && !vistos[tipo]) {
+      vistos[tipo] = true
+      tipos.push(tipo)
+    }
+  }
+  return updateRowById_(SHEETS.CLIENTE, clienteId, { tiposAplicados: tipos.join(',') })
 }
 
 // Al desactivar un cliente, desactiva en cascada sus visitas — si no,
@@ -422,7 +436,7 @@ function guardarEnCacheDeHoja_(sheetName, rows) {
 
 // Convierte cada fila (a partir de la 2) en un objeto {header: valor},
 // normalizando fechas (Date -> "YYYY-MM-DD") y "activo" (-> booleano real).
-// Los objetos devueltos nunca se mutan en el lugar (filtrarPrecio_ y afines
+// Los objetos devueltos nunca se mutan en el lugar (mergeForce_ y afines
 // siempre copian), así que es seguro compartir las mismas referencias entre
 // varios callers del mismo request, y también reconstruirlos tal cual desde
 // JSON entre requests distintos (ver los dos niveles de caché arriba).
@@ -561,10 +575,12 @@ var CAMPOS_ESCRIBIBLES = {
     'decoloracionEtapa',
     'formulaRaiz',
     'oxidanteRaiz',
+    'onzasRaiz',
     'tiempoRaiz',
     'amonioRaiz',
     'formulaMediosAPuntas',
     'oxidanteMediosAPuntas',
+    'onzasMediosAPuntas',
     'tiempoMediosAPuntas',
     'amonioMediosAPuntas',
     'fecha',

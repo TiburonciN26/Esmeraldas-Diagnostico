@@ -17,7 +17,16 @@ const EXIT_MS = 180
 //   el padre lo desmonte de golpe apenas cambia su estado — por eso los
 //   componentes que lo usan pasan open={open} y SIEMPRE renderizan
 //   <Modal>, sin envolverlo en "{open && <Modal>...}".
-export default function Modal({ open, title, onClose, children, footer, centered }) {
+// - headerIcon/subtitle son opcionales — sin ellos el header se ve
+//   exactamente igual que siempre (solo título + botón cerrar), así que
+//   no afectan a ningún otro modal de la app que no los pase (por ahora
+//   solo VisitaModal.jsx los usa, para el encabezado con ícono).
+// - arriba (opcional, alternativa a "centered"): en vez de centrarlo
+//   verticalmente, lo pega cerca del borde superior y lo ensancha — hoy
+//   solo VisitaModal.jsx lo usa (formulario largo con muchos campos, deja
+//   espacio abajo para que el teclado del celular no tape el formulario al
+//   escribir). Ningún otro modal lo pasa, así que no cambia para ellos.
+export default function Modal({ open, title, subtitle, headerIcon, onClose, children, footer, centered, arriba }) {
   const [rendered, setRendered] = useState(open)
   const [closing, setClosing] = useState(false)
   const modalRef = useRef(null)
@@ -101,23 +110,29 @@ export default function Modal({ open, title, onClose, children, footer, centered
   return (
     <div
       className={`modal-overlay ${centered ? 'modal-overlay--centered' : ''} ${
-        closing ? 'modal-overlay--closing' : ''
-      }`}
+        arriba ? 'modal-overlay--arriba' : ''
+      } ${closing ? 'modal-overlay--closing' : ''}`}
       onMouseDown={onClose}
     >
       <div
         ref={modalRef}
-        className={`modal ${centered ? 'modal--centered' : ''} ${closing ? 'modal--closing' : ''}`}
+        className={`modal ${centered ? 'modal--centered' : ''} ${arriba ? 'modal--arriba' : ''} ${
+          closing ? 'modal--closing' : ''
+        }`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="modal__header">
-          <h2 className="modal__title" id={titleId}>
-            {title}
-          </h2>
+        <div className={`modal__header ${headerIcon ? 'modal__header--icon' : ''}`}>
+          {headerIcon && <div className="modal__header-icon">{headerIcon}</div>}
+          <div className="modal__header-text">
+            <h2 className="modal__title" id={titleId}>
+              {title}
+            </h2>
+            {subtitle && <div className="modal__subtitle">{subtitle}</div>}
+          </div>
           <button className="modal__close" onClick={onClose} aria-label="Cerrar">
             ×
           </button>

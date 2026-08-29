@@ -8,13 +8,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 // labelExtra pinta algo (ej. un toggle de íconos) al otro extremo de la
 // fila de la etiqueta, sin tocar el resto del campo — ver "Tipo de
 // aplicación" en VisitaModal.jsx.
-export function Field({ label, error, hint, children, htmlFor, required, labelExtra }) {
+// icon: ícono decorativo (lucide-react) antes del texto de la etiqueta —
+// puramente visual, no cambia el nombre/texto del campo.
+export function Field({ label, error, hint, children, htmlFor, required, labelExtra, icon }) {
   const errorId = htmlFor ? `${htmlFor}-error` : undefined
   return (
     <div className="field">
       {label && (
         <div className={`field__label-row ${labelExtra ? 'field__label-row--extra' : ''}`}>
           <label className="field__label" htmlFor={htmlFor}>
+            {icon && (
+              <span className="field__icon" aria-hidden="true">
+                {icon}
+              </span>
+            )}
             {label}
             {required && (
               <span className="field__required" aria-hidden="true">

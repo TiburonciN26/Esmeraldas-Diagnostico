@@ -1,7 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import { Split, Merge, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
+import {
+  Split,
+  Merge,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  FlaskConical,
+  Layers,
+  Calendar,
+  Sparkles,
+  Scissors,
+  Paintbrush,
+  Timer,
+  Palette,
+  Banknote,
+  FileText,
+  Camera,
+} from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { useSession } from '../../context/SessionContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
 import { createVisita, updateVisita, visitaVacia, generarIdVisita } from '../../services'
@@ -9,7 +24,6 @@ import {
   TIPOS_APLICACION,
   PORCENTAJE_CANAS,
   LARGO_CABELLO,
-  COLORES_OBTENIDOS,
   TIPO_SOLO_RAIZ,
   TIPOS_SOLO_MEDIOS,
   TIPO_TRES_MODOS,
@@ -29,10 +43,12 @@ const CAMPOS_PRECARGA = [
   'decoloracionEtapa',
   'formulaRaiz',
   'oxidanteRaiz',
+  'onzasRaiz',
   'tiempoRaiz',
   'amonioRaiz',
   'formulaMediosAPuntas',
   'oxidanteMediosAPuntas',
+  'onzasMediosAPuntas',
   'tiempoMediosAPuntas',
   'amonioMediosAPuntas',
   'colorObtenido',
@@ -74,13 +90,18 @@ function AmonioToggle({ valor, onChange, idBase, error }) {
 }
 
 export default function VisitaModal() {
-  const { visitaModal, closeVisitaModal, aplicarVisitaGuardada } = useApp()
-  const { session } = useSession()
-  const esAdmin = session?.rol === 'administrador'
+  const { visitaModal, closeVisitaModal, aplicarVisitaGuardada, clienteDetalle } = useApp()
   const confirmar = useConfirm()
   const toast = useToast()
   const { open, clienteId, visitaId, visita } = visitaModal
   const esEdicion = Boolean(visitaId)
+  // Solo para el subtítulo del header ("Cliente: ..."). clienteDetalle es
+  // del cliente actualmente ABIERTO en Detalle de cliente — coincide con
+  // clienteId salvo el instante en que este modal todavía está montado
+  // mientras se navega a otro lado; el chequeo evita mostrar el nombre de
+  // otro cliente en ese instante.
+  const nombreCliente =
+    clienteDetalle.cliente?.id === clienteId ? clienteDetalle.cliente.nombreCompleto : null
 
   const [form, setForm] = useState({ ...visitaVacia })
   // Fórmula única para todo el cabello (raíz y medios a puntas comparten
@@ -139,11 +160,21 @@ export default function VisitaModal() {
         datos.tiempoRaiz === datos.tiempoMediosAPuntas
     )
 
-    // "Fórmula única" (toggle Split/Merge) solo se infiere al editar, y
-    // nunca para "Baño de color" (ese usa modoBanio en su lugar).
+    // Hay datos reales de dónde inferir el modo (botones) tanto al editar
+    // como al dar de alta CON precarga de la última visita — antes esto
+    // solo miraba "esEdicion", así que una visita nueva heredaba la
+    // fórmula/oxidante/tiempo de la anterior (ver CAMPOS_PRECARGA arriba)
+    // pero el botón siempre volvía a "única" por defecto, perdiendo de
+    // vista con qué modo se había cargado en realidad (obligaba a
+    // corregirlo a mano cada vez). Alta SIN historial (visita null) sigue
+    // sin nada de dónde inferir, así que cae en los defaults de siempre.
+    const hayDatosParaInferir = esEdicion || Boolean(visita)
+
+    // "Fórmula única" (toggle Split/Merge) nunca se infiere para "Baño de
+    // color" (ese usa modoBanio en su lugar).
     setFormulaUnica(
       Boolean(
-        esEdicion &&
+        hayDatosParaInferir &&
           datos.tipoAplicacion !== TIPO_SOLO_RAIZ &&
           !TIPOS_SOLO_MEDIOS.includes(datos.tipoAplicacion) &&
           datos.tipoAplicacion !== TIPO_TRES_MODOS &&
@@ -151,13 +182,12 @@ export default function VisitaModal() {
       )
     )
 
-    // modoBanio se infiere al editar un "Baño de color": mirando qué
-    // campos tienen contenido, no hay forma de saber si alguna vez fue
-    // "distinta" (ese modo ya no existe para este tipo) — en el peor caso
-    // (datos viejos con raíz y medios distintos) se muestra "raiz" como
-    // resguardo, para no perder de vista ningún dato con un guardado
-    // accidental.
-    if (esEdicion && datos.tipoAplicacion === TIPO_TRES_MODOS) {
+    // modoBanio se infiere para "Baño de color" mirando qué campos tienen
+    // contenido — no hay forma de saber si alguna vez fue "distinta" (ese
+    // modo ya no existe para este tipo) — en el peor caso (datos viejos con
+    // raíz y medios distintos) se muestra "raiz" como resguardo, para no
+    // perder de vista ningún dato con un guardado accidental.
+    if (hayDatosParaInferir && datos.tipoAplicacion === TIPO_TRES_MODOS) {
       if (coincidenRaizYMedios) setModoBanio('unica')
       else if (datos.formulaMediosAPuntas.trim() && !datos.formulaRaiz.trim()) setModoBanio('medios')
       else setModoBanio('raiz')
@@ -191,15 +221,17 @@ export default function VisitaModal() {
   // otro caso (incluida "fórmula única").
   const campoFormula = modoSoloMedios ? 'formulaMediosAPuntas' : 'formulaRaiz'
   const campoOxidante = modoSoloMedios ? 'oxidanteMediosAPuntas' : 'oxidanteRaiz'
+  const campoOnzas = modoSoloMedios ? 'onzasMediosAPuntas' : 'onzasRaiz'
   const campoTiempo = modoSoloMedios ? 'tiempoMediosAPuntas' : 'tiempoRaiz'
   const campoAmonio = modoSoloMedios ? 'amonioMediosAPuntas' : 'amonioRaiz'
   const idFormula = modoSoloMedios ? 'v-fmed' : 'v-fraiz'
   const idOxidante = modoSoloMedios ? 'v-omed' : 'v-oraiz'
+  const idOnzas = modoSoloMedios ? 'v-zmed' : 'v-zraiz'
   const idTiempo = modoSoloMedios ? 'v-tmed' : 'v-traiz'
   const labelFormula = modoSoloMedios
-    ? 'Fórmula medios a puntas'
+    ? 'Fórmula '
     : modoUnica
-    ? 'Fórmula (raíz y puntas)'
+    ? 'Fórmula '
     : 'Fórmula raíz'
 
   // Toggle de modo de fórmula: 3 íconos para "Baño de color", 2 (Split/
@@ -222,7 +254,7 @@ export default function VisitaModal() {
         title="Solo raíz"
         onClick={() => setModoBanio('raiz')}
       >
-        <ArrowUpToLine size={15} strokeWidth={2.25} />
+        <ArrowUpToLine size={14} strokeWidth={2.25} />
       </button>
       <button
         type="button"
@@ -231,7 +263,7 @@ export default function VisitaModal() {
         title="Solo medios a puntas"
         onClick={() => setModoBanio('medios')}
       >
-        <ArrowDownToLine size={15} strokeWidth={2.25} />
+        <ArrowDownToLine size={14} strokeWidth={2.25} />
       </button>
       <button
         type="button"
@@ -240,7 +272,7 @@ export default function VisitaModal() {
         title="Todo el cabello (una sola fórmula)"
         onClick={() => setModoBanio('unica')}
       >
-        <Merge size={15} strokeWidth={2.25} />
+        <Merge size={14} strokeWidth={2.25} />
       </button>
     </div>
   ) : (
@@ -258,7 +290,7 @@ export default function VisitaModal() {
           title="Fórmula distinta para raíz y medios a puntas"
           onClick={() => setFormulaUnica(false)}
         >
-          <Split size={15} strokeWidth={2.25} />
+          <Split size={14} strokeWidth={2.25} />
         </button>
         <button
           type="button"
@@ -267,7 +299,7 @@ export default function VisitaModal() {
           title="Una sola fórmula para todo el cabello"
           onClick={() => setFormulaUnica(true)}
         >
-          <Merge size={15} strokeWidth={2.25} />
+          <Merge size={14} strokeWidth={2.25} />
         </button>
       </div>
     )
@@ -302,13 +334,10 @@ export default function VisitaModal() {
       if (!form.tiempoMediosAPuntas.trim()) e.tiempoMediosAPuntas = 'Este campo es obligatorio.'
       if (!form.amonioMediosAPuntas) e.amonioMediosAPuntas = 'Elegí si lleva amonio.'
     }
-    if (!form.colorObtenido) e.colorObtenido = 'Elegí el color obtenido.'
+    if (!form.colorObtenido.trim()) e.colorObtenido = 'Este campo es obligatorio.'
     if (!form.largoCabello) e.largoCabello = 'Elegí el largo del cabello.'
     if (!form.fecha) e.fecha = 'La fecha es obligatoria.'
-    if (esAdmin) {
-      if (form.precio === '') e.precio = 'Este campo es obligatorio.'
-      else if (Number(form.precio) < 0) e.precio = 'No puede ser negativo.'
-    }
+    if (form.precio !== '' && Number(form.precio) < 0) e.precio = 'No puede ser negativo.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -339,6 +368,7 @@ export default function VisitaModal() {
       // a puntas, se vacía.
       limpio.formulaMediosAPuntas = ''
       limpio.oxidanteMediosAPuntas = ''
+      limpio.onzasMediosAPuntas = ''
       limpio.tiempoMediosAPuntas = ''
       limpio.amonioMediosAPuntas = ''
     } else if (modoSoloMedios) {
@@ -347,6 +377,7 @@ export default function VisitaModal() {
       // campoFormula); acá no hay raíz, se vacía.
       limpio.formulaRaiz = ''
       limpio.oxidanteRaiz = ''
+      limpio.onzasRaiz = ''
       limpio.tiempoRaiz = ''
       limpio.amonioRaiz = ''
     } else if (modoUnica) {
@@ -355,6 +386,7 @@ export default function VisitaModal() {
       // como si se hubiera cargado dos veces a mano.
       limpio.formulaMediosAPuntas = limpio.formulaRaiz
       limpio.oxidanteMediosAPuntas = limpio.oxidanteRaiz
+      limpio.onzasMediosAPuntas = limpio.onzasRaiz
       limpio.tiempoMediosAPuntas = limpio.tiempoRaiz
       limpio.amonioMediosAPuntas = limpio.amonioRaiz
     }
@@ -369,14 +401,16 @@ export default function VisitaModal() {
 
     try {
       // Editar modifica ESA visita; alta siempre crea un registro nuevo (la
-      // última visita no se toca). Ambas devuelven la fila final (con foto
-      // ya subida a Drive, precio filtrado por rol) — se aplica directo al
-      // estado en memoria, sin volver a pedir el cliente completo.
-      const visitaGuardada = esEdicion
+      // última visita no se toca). Ambas devuelven { visita, cliente }: la
+      // fila final de la visita (con foto ya subida a Drive) y la fila de
+      // cliente con "tiposAplicados" recalculado (ver Code.gs) — se
+      // aplican directo al estado en memoria, sin volver a pedir el cliente
+      // completo ni la lista de Home.
+      const { visita: visitaGuardada, cliente: clienteActualizado } = esEdicion
         ? await updateVisita(visitaId, datos)
         : await createVisita(clienteId, nuevaVisitaIdRef.current, datos)
 
-      aplicarVisitaGuardada(visitaGuardada)
+      aplicarVisitaGuardada(visitaGuardada, clienteActualizado)
       closeVisitaModal()
       toast(esEdicion ? 'Visita actualizada' : 'Visita guardada')
     } catch (err) {
@@ -398,15 +432,28 @@ export default function VisitaModal() {
   return (
     <Modal
       open={open}
-      centered
+      arriba
       title={esEdicion ? 'Editar visita' : 'Nueva visita'}
+      subtitle={
+        nombreCliente ? (
+          <>
+            Cliente: <strong>{nombreCliente}</strong>
+          </>
+        ) : undefined
+      }
+      headerIcon={<FlaskConical size={19} strokeWidth={2.25} aria-hidden="true" />}
       onClose={cerrarConGuardia}
       footer={
         <>
           <Button variant="ghost" onClick={cerrarConGuardia} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleGuardar} disabled={saving}>
+          <Button
+            variant="primary"
+            className="btn--sin-borde-rosa"
+            onClick={handleGuardar}
+            disabled={saving}
+          >
             {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         </>
@@ -418,233 +465,346 @@ export default function VisitaModal() {
         </div>
       )}
 
-      {/* Todos los <select> obligatorios de acá abajo llevan placeholder
-          ("Elegir…"): un <select> sin opción vacía siempre muestra la
-          primera opción como si ya estuviera elegida — si el usuario la
-          quiere de verdad, no puede "reseleccionarla" (un <select> nativo
-          no dispara onChange si no cambia el valor), así que el campo
-          quedaría atascado en vacío sin poder guardar. */}
-      <div className="form-row form-row--2-1">
-        <Field label="Tipo de aplicación" required error={errors.tipoAplicacion} htmlFor="v-tipo">
-          {/* El toggle de modo de fórmula va pegado al select, no a la
-              etiqueta (ver comentario de .campo-con-toggle en index.css). */}
-          <div className="campo-con-toggle">
-            <Select
-              id="v-tipo"
-              options={TIPOS_APLICACION}
-              placeholder="Elegir…"
-              value={form.tipoAplicacion}
+      {/* Sección 1: datos generales de la visita. Sin título — el acento
+          de color arriba de la tarjeta (ver .visita-seccion--parametros)
+          es lo único que la separa de las otras 2. */}
+      <div className="visita-seccion visita-seccion--parametros">
+        {/* Todos los <select> obligatorios de acá abajo llevan placeholder
+            ("Elegir…"): un <select> sin opción vacía siempre muestra la
+            primera opción como si ya estuviera elegida — si el usuario la
+            quiere de verdad, no puede "reseleccionarla" (un <select> nativo
+            no dispara onChange si no cambia el valor), así que el campo
+            quedaría atascado en vacío sin poder guardar.
+            Los 4 campos en una sola fila en tablet/desktop, pero en DOS
+            grupos separados (ver .grupo-tipo-canas y .grupo-largo-fecha)
+            que nunca comparten columna de grid entre sí — antes, con los 4
+            en un solo grid de 2 columnas que se envuelve en celular
+            (Tipo+Canas en una fila, Largo+Fecha en la siguiente), "Fecha"
+            terminaba compartiendo columna con "% de canas" (misma
+            posición, fila distinta), y como Fecha necesita más ancho que
+            "% de canas", esa columna se ensanchaba de más y le robaba
+            espacio a "Tipo de aplicación" sin que se notara en tablet.
+            Separados en 2 grupos, "% de canas" ya no tiene relación
+            ninguna con el ancho de "Fecha". */}
+        <div className="grupo-tipo-canas-largo-fecha">
+          <div className="grupo-tipo-canas">
+            <Field
+              icon={<Layers size={14} strokeWidth={2.25} />}
+              label="Tipo de aplicación"
+              required
               error={errors.tipoAplicacion}
-              onChange={(e) => set('tipoAplicacion', e.target.value)}
-            />
-            {formulaModoToggle}
-          </div>
-        </Field>
+              htmlFor="v-tipo"
+            >
+              {/* El toggle de modo de fórmula va pegado al select, no a la
+                  etiqueta (ver comentario de .campo-con-toggle en index.css). */}
+              <div className="campo-con-toggle">
+                <Select
+                  id="v-tipo"
+                  options={TIPOS_APLICACION}
+                  placeholder="Elegir…"
+                  value={form.tipoAplicacion}
+                  error={errors.tipoAplicacion}
+                  onChange={(e) => set('tipoAplicacion', e.target.value)}
+                />
+                {formulaModoToggle}
+              </div>
+            </Field>
 
-        <Field label="% de canas" required error={errors.porcentajeCanas} htmlFor="v-canas">
-          <Select
-            id="v-canas"
-            className="select--corto"
-            options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
-            placeholder="Elegir…"
-            value={form.porcentajeCanas}
-            error={errors.porcentajeCanas}
-            onChange={(e) => set('porcentajeCanas', e.target.value)}
-          />
-        </Field>
-      </div>
-
-      {/* Condicional: decoloración - etapa */}
-      {vis.decoloracion && (
-        <Field
-          label="Decoloración — etapa"
-          required
-          error={errors.decoloracionEtapa}
-          htmlFor="v-decol"
-        >
-          <div className="field--cond">
-            <TextInput
-              id="v-decol"
-              value={form.decoloracionEtapa}
-              error={errors.decoloracionEtapa}
-              onChange={(e) => set('decoloracionEtapa', e.target.value)}
-            />
-          </div>
-        </Field>
-      )}
-
-      {/* Fórmula + oxígeno + tiempo principal — raíz salvo "Medio a punta"
-          (usa medios a puntas directo) o "fórmula única" (label cambia,
-          campos siguen siendo los de raíz). Los 3 en una fila y siempre
-          visibles juntos (ya no se revelan a medida que se escribe). */}
-      <div className="formula-row">
-        <Field
-          label={labelFormula}
-          required
-          error={errors[campoFormula]}
-          htmlFor={idFormula}
-          labelExtra={
-            <AmonioToggle
-              valor={form[campoAmonio]}
-              onChange={(v) => set(campoAmonio, v)}
-              idBase={idFormula}
-              error={errors[campoAmonio]}
-            />
-          }
-        >
-          <AutoGrowInput
-            id={idFormula}
-            minChars={15}
-            anchoResponsivo
-            crecer
-            value={form[campoFormula]}
-            error={errors[campoFormula]}
-            onChange={(e) => set(campoFormula, e.target.value)}
-          />
-        </Field>
-
-        <Field label="Oxig. Vol" required error={errors[campoOxidante]} htmlFor={idOxidante}>
-          <TextInput
-            id={idOxidante}
-            className="input--corto"
-            value={form[campoOxidante]}
-            error={errors[campoOxidante]}
-            onChange={(e) => set(campoOxidante, e.target.value)}
-          />
-        </Field>
-
-        <Field label="Tiempo" required error={errors[campoTiempo]} htmlFor={idTiempo}>
-          <AutoGrowInput
-            id={idTiempo}
-            type="number"
-            inputMode="numeric"
-            min="0"
-            minChars={6}
-            value={form[campoTiempo]}
-            error={errors[campoTiempo]}
-            onChange={(e) => set(campoTiempo, e.target.value)}
-          />
-        </Field>
-      </div>
-
-      {/* Fórmula + oxígeno + tiempo (medios a puntas) como bloque APARTE —
-          solo cuando de verdad hay una fórmula distinta para raíz y
-          medios (nunca para "Baño de color", "Retoque de raíz"/"Medio a
-          punta", ni en modo "fórmula única": la fila de arriba ya cubre
-          todo el cabello en esos casos). */}
-      {mostrarMediosAparte && (
-        <div className="field--cond formula-row">
-          <Field
-            label="Fórmula medios a puntas"
-            required
-            error={errors.formulaMediosAPuntas}
-            htmlFor="v-fmed"
-            labelExtra={
-              <AmonioToggle
-                valor={form.amonioMediosAPuntas}
-                onChange={(v) => set('amonioMediosAPuntas', v)}
-                idBase="v-fmed-aparte"
-                error={errors.amonioMediosAPuntas}
+            <Field label="% de canas" required error={errors.porcentajeCanas} htmlFor="v-canas">
+              <Select
+                id="v-canas"
+                className="select--corto"
+                options={PORCENTAJE_CANAS.map((p) => ({ value: p, label: `${p}%` }))}
+                placeholder="Elegir…"
+                value={form.porcentajeCanas}
+                error={errors.porcentajeCanas}
+                onChange={(e) => set('porcentajeCanas', e.target.value)}
               />
-            }
-          >
-            <AutoGrowInput
-              id="v-fmed"
-              minChars={15}
-              anchoResponsivo
-              crecer
-              value={form.formulaMediosAPuntas}
-              error={errors.formulaMediosAPuntas}
-              onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
-            />
-          </Field>
+            </Field>
+          </div>
 
-          <Field label="Oxig. Vol" required error={errors.oxidanteMediosAPuntas} htmlFor="v-omed">
-            <TextInput
-              id="v-omed"
-              className="input--corto"
-              value={form.oxidanteMediosAPuntas}
-              error={errors.oxidanteMediosAPuntas}
-              onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
-            />
-          </Field>
+          <div className="grupo-largo-fecha">
+            <Field label="Largo del cabello" required error={errors.largoCabello} htmlFor="v-largo">
+              <Select
+                id="v-largo"
+                options={LARGO_CABELLO}
+                placeholder="Elegir…"
+                value={form.largoCabello}
+                error={errors.largoCabello}
+                onChange={(e) => set('largoCabello', e.target.value)}
+              />
+            </Field>
 
-          <Field label="Tiempo" required error={errors.tiempoMediosAPuntas} htmlFor="v-tmed">
-            <AutoGrowInput
-              id="v-tmed"
-              type="number"
-              inputMode="numeric"
-              min="0"
-              minChars={6}
-              value={form.tiempoMediosAPuntas}
-              error={errors.tiempoMediosAPuntas}
-              onChange={(e) => set('tiempoMediosAPuntas', e.target.value)}
-            />
-          </Field>
+            <Field
+              icon={<Calendar size={14} strokeWidth={2.25} />}
+              label="Fecha"
+              required
+              error={errors.fecha}
+              htmlFor="v-fecha"
+            >
+              <TextInput
+                id="v-fecha"
+                type="date"
+                value={form.fecha}
+                error={errors.fecha}
+                onChange={(e) => set('fecha', e.target.value)}
+              />
+            </Field>
+          </div>
         </div>
-      )}
 
-      {/* Resultado y datos generales */}
-      <div className="form-row">
-        <Field label="Color obtenido" required error={errors.colorObtenido} htmlFor="v-color">
-          <Select
-            id="v-color"
-            options={COLORES_OBTENIDOS}
-            placeholder="Elegir…"
-            value={form.colorObtenido}
-            error={errors.colorObtenido}
-            onChange={(e) => set('colorObtenido', e.target.value)}
-          />
-        </Field>
-
-        <Field label="Largo del cabello" required error={errors.largoCabello} htmlFor="v-largo">
-          <Select
-            id="v-largo"
-            options={LARGO_CABELLO}
-            placeholder="Elegir…"
-            value={form.largoCabello}
-            error={errors.largoCabello}
-            onChange={(e) => set('largoCabello', e.target.value)}
-          />
-        </Field>
-      </div>
-
-      <div className="form-row">
-        <Field label="Fecha" required error={errors.fecha} htmlFor="v-fecha">
-          <TextInput
-            id="v-fecha"
-            type="date"
-            value={form.fecha}
-            error={errors.fecha}
-            onChange={(e) => set('fecha', e.target.value)}
-          />
-        </Field>
-
-        {esAdmin && (
-          <Field label="Precio" required error={errors.precio} htmlFor="v-precio">
-            <TextInput
-              id="v-precio"
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={form.precio}
-              error={errors.precio}
-              onChange={(e) => set('precio', e.target.value)}
-            />
+        {/* Condicional: decoloración - etapa */}
+        {vis.decoloracion && (
+          <Field
+            icon={<Sparkles size={14} strokeWidth={2.25} />}
+            label="Decoloración — etapa"
+            required
+            error={errors.decoloracionEtapa}
+            htmlFor="v-decol"
+          >
+            <div className="field--cond">
+              <TextInput
+                id="v-decol"
+                value={form.decoloracionEtapa}
+                error={errors.decoloracionEtapa}
+                onChange={(e) => set('decoloracionEtapa', e.target.value)}
+              />
+            </div>
           </Field>
         )}
       </div>
 
-      <Field label="Nota" htmlFor="v-nota">
-        <TextArea id="v-nota" value={form.nota} onChange={(e) => set('nota', e.target.value)} />
-      </Field>
+      {/* Sección 2: fórmulas + oxígeno + tiempo. Sin título, mismo criterio
+          que la sección 1. */}
+      <div className="visita-seccion visita-seccion--formulas">
+        {/* Fórmula + oxígeno + tiempo principal — raíz salvo "Medio a punta"
+            (usa medios a puntas directo) o "fórmula única" (label cambia,
+            campos siguen siendo los de raíz). Los 3 en una fila y siempre
+            visibles juntos (ya no se revelan a medida que se escribe). */}
+        <div className="formula-row">
+          <Field
+            icon={
+              modoSoloMedios ? (
+                <Paintbrush size={14} strokeWidth={2.25} />
+              ) : (
+                <Scissors size={14} strokeWidth={2.25} />
+              )
+            }
+            label={labelFormula}
+            required
+            error={errors[campoFormula]}
+            htmlFor={idFormula}
+            labelExtra={
+              <AmonioToggle
+                valor={form[campoAmonio]}
+                onChange={(v) => set(campoAmonio, v)}
+                idBase={idFormula}
+                error={errors[campoAmonio]}
+              />
+            }
+          >
+            <AutoGrowInput
+              id={idFormula}
+              minChars={15}
+              anchoResponsivo
+              crecer
+              value={form[campoFormula]}
+              error={errors[campoFormula]}
+              onChange={(e) => set(campoFormula, e.target.value)}
+            />
+          </Field>
 
-      <Field
-        label="Foto del resultado"
-        htmlFor="v-foto"
-        hint="Se comprime automáticamente y se sube al guardar la visita."
-        error={errorFoto}
-      >
+          <Field
+            label="Oxígeno"
+            required
+            error={errors[campoOxidante]}
+            htmlFor={idOxidante}
+          >
+            <div className={`input-con-prefijo ${errors[campoOxidante] ? 'input-con-prefijo--error' : ''}`}>
+              <span className="input-con-prefijo__prefijo">Vol</span>
+              <TextInput
+                id={idOxidante}
+                className="input--corto"
+                value={form[campoOxidante]}
+                error={errors[campoOxidante]}
+                onChange={(e) => set(campoOxidante, e.target.value)}
+              />
+            </div>
+          </Field>
+
+          <Field label="Onzas" htmlFor={idOnzas}>
+            <div className="input-con-prefijo">
+              <TextInput
+                id={idOnzas}
+                className="input--corto"
+                value={form[campoOnzas]}
+                onChange={(e) => set(campoOnzas, e.target.value)}
+              />
+              <span className="input-con-prefijo__sufijo">oz</span>
+            </div>
+          </Field>
+
+          <Field
+            icon={<Timer size={14} strokeWidth={2.25} />}
+            label="Tiempo"
+            required
+            error={errors[campoTiempo]}
+            htmlFor={idTiempo}
+          >
+            <div className={`input-con-prefijo ${errors[campoTiempo] ? 'input-con-prefijo--error' : ''}`}>
+              <TextInput
+                id={idTiempo}
+                type="number"
+                inputMode="numeric"
+                min="0"
+                className="input--corto"
+                value={form[campoTiempo]}
+                error={errors[campoTiempo]}
+                onChange={(e) => set(campoTiempo, e.target.value)}
+              />
+              <span className="input-con-prefijo__sufijo">Min</span>
+            </div>
+          </Field>
+        </div>
+
+        {/* Fórmula + oxígeno + tiempo (medios a puntas) como bloque APARTE —
+            solo cuando de verdad hay una fórmula distinta para raíz y
+            medios (nunca para "Baño de color", "Retoque de raíz"/"Medio a
+            punta", ni en modo "fórmula única": la fila de arriba ya cubre
+            todo el cabello en esos casos). */}
+        {mostrarMediosAparte && (
+          <div className="field--cond formula-row">
+            <Field
+              icon={<Paintbrush size={14} strokeWidth={2.25} />}
+              label="Fórmula medios a puntas"
+              required
+              error={errors.formulaMediosAPuntas}
+              htmlFor="v-fmed"
+              labelExtra={
+                <AmonioToggle
+                  valor={form.amonioMediosAPuntas}
+                  onChange={(v) => set('amonioMediosAPuntas', v)}
+                  idBase="v-fmed-aparte"
+                  error={errors.amonioMediosAPuntas}
+                />
+              }
+            >
+              <AutoGrowInput
+                id="v-fmed"
+                minChars={15}
+                anchoResponsivo
+                crecer
+                value={form.formulaMediosAPuntas}
+                error={errors.formulaMediosAPuntas}
+                onChange={(e) => set('formulaMediosAPuntas', e.target.value)}
+              />
+            </Field>
+
+            <Field
+              label="Oxígeno"
+              required
+              error={errors.oxidanteMediosAPuntas}
+              htmlFor="v-omed"
+            >
+              <div className={`input-con-prefijo ${errors.oxidanteMediosAPuntas ? 'input-con-prefijo--error' : ''}`}>
+                <span className="input-con-prefijo__prefijo">Vol</span>
+                <TextInput
+                  id="v-omed"
+                  className="input--corto"
+                  value={form.oxidanteMediosAPuntas}
+                  error={errors.oxidanteMediosAPuntas}
+                  onChange={(e) => set('oxidanteMediosAPuntas', e.target.value)}
+                />
+              </div>
+            </Field>
+
+            <Field label="Onzas" htmlFor="v-zmed">
+              <div className="input-con-prefijo">
+                <TextInput
+                  id="v-zmed"
+                  className="input--corto"
+                  value={form.onzasMediosAPuntas}
+                  onChange={(e) => set('onzasMediosAPuntas', e.target.value)}
+                />
+                <span className="input-con-prefijo__sufijo">oz</span>
+              </div>
+            </Field>
+
+            <Field
+              icon={<Timer size={14} strokeWidth={2.25} />}
+              label="Tiempo"
+              required
+              error={errors.tiempoMediosAPuntas}
+              htmlFor="v-tmed"
+            >
+              <div className={`input-con-prefijo ${errors.tiempoMediosAPuntas ? 'input-con-prefijo--error' : ''}`}>
+                <TextInput
+                  id="v-tmed"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  className="input--corto"
+                  value={form.tiempoMediosAPuntas}
+                  error={errors.tiempoMediosAPuntas}
+                  onChange={(e) => set('tiempoMediosAPuntas', e.target.value)}
+                />
+                <span className="input-con-prefijo__sufijo">Min</span>
+              </div>
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {/* Sección 3: resultado, notas y cobro. Sin título, mismo criterio
+          que las secciones 1 y 2. */}
+      <div className="visita-seccion visita-seccion--resultado">
+        <div className="form-row">
+          <Field
+            icon={<Palette size={14} strokeWidth={2.25} />}
+            label="Color obtenido"
+            required
+            error={errors.colorObtenido}
+            htmlFor="v-color"
+          >
+            <TextInput
+              id="v-color"
+              value={form.colorObtenido}
+              error={errors.colorObtenido}
+              onChange={(e) => set('colorObtenido', e.target.value)}
+            />
+          </Field>
+
+          <Field
+            icon={<Banknote size={14} strokeWidth={2.25} />}
+            label="Precio"
+            error={errors.precio}
+            htmlFor="v-precio"
+          >
+            <div className={`input-con-prefijo ${errors.precio ? 'input-con-prefijo--error' : ''}`}>
+              <span className="input-con-prefijo__prefijo">S/.</span>
+              <TextInput
+                id="v-precio"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={form.precio}
+                error={errors.precio}
+                onChange={(e) => set('precio', e.target.value)}
+              />
+            </div>
+          </Field>
+        </div>
+
+        <Field icon={<FileText size={14} strokeWidth={2.25} />} label="Nota" htmlFor="v-nota">
+          <TextArea id="v-nota" value={form.nota} onChange={(e) => set('nota', e.target.value)} />
+        </Field>
+
+        <Field
+          icon={<Camera size={14} strokeWidth={2.25} />}
+          label="Foto del resultado"
+          htmlFor="v-foto"
+          error={errorFoto}
+        >
         {/* Input real oculto (.sr-only, no display:none: sigue en el tab
             order) — el botón visible es el <label> de abajo, así se puede
             controlar el texto ("Tomar foto" en celular/tablet), cosa que
@@ -681,7 +841,8 @@ export default function VisitaModal() {
             </div>
           </div>
         )}
-      </Field>
+        </Field>
+      </div>
     </Modal>
   )
 }

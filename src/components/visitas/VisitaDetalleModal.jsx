@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
-import { useSession } from '../../context/SessionContext'
 import { useConfirm, useAlert } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
 import { deleteVisita } from '../../services'
@@ -16,8 +15,6 @@ import { Dato } from '../ui/Card'
 // ya trae el objeto completo (nada que pedirle al backend acá).
 export default function VisitaDetalleModal() {
   const { visitaView, closeVerVisita, openEditarVisita, aplicarVisitaEliminada } = useApp()
-  const { session } = useSession()
-  const esAdmin = session?.rol === 'administrador'
   const { open, visita } = visitaView
   const confirmar = useConfirm()
   const alertar = useAlert()
@@ -81,8 +78,11 @@ export default function VisitaDetalleModal() {
     if (!ok) return
     setDeleting(true)
     try {
-      await deleteVisita(visitaMostrada.id)
-      aplicarVisitaEliminada(visitaMostrada.id, visitaMostrada.clienteId)
+      // Devuelve { cliente }: la fila de cliente con "tiposAplicados"
+      // recalculado (si era la única visita de ese tipo, deja de tenerlo) —
+      // ver actualizarTiposDeCliente_ en Code.gs.
+      const { cliente: clienteActualizado } = await deleteVisita(visitaMostrada.id)
+      aplicarVisitaEliminada(visitaMostrada.id, visitaMostrada.clienteId, clienteActualizado)
       closeVerVisita()
       toast('Visita eliminada')
     } catch (err) {
@@ -193,7 +193,7 @@ export default function VisitaDetalleModal() {
           <div className="detalle-section">
             <h3 className="form-section-label">Resultado y datos</h3>
             <div className="dato-grid dato-grid--split">
-              {esAdmin && <Dato label="Precio">{fmtPrecio(visitaMostrada.precio)}</Dato>}
+              <Dato label="Precio">{fmtPrecio(visitaMostrada.precio)}</Dato>
               <Dato label="Color obtenido">{visitaMostrada.colorObtenido}</Dato>
               <Dato label="Largo del cabello">{visitaMostrada.largoCabello}</Dato>
               <Dato label="Fecha">{fmtFecha(visitaMostrada.fecha)}</Dato>

@@ -159,29 +159,61 @@ export function AppProvider({ children }) {
   const ordenarVisitas = (visitas) =>
     [...visitas].sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))
 
-  // Resultado de crear/editar una visita: upsert directo en la entrada de
-  // caché de ese cliente (sin refetch). Si ese cliente no tiene entrada
-  // cacheada (no debería pasar — el modal solo se abre desde su Detalle) no
-  // hace nada.
-  const aplicarVisitaGuardada = useCallback((visita) => {
+  // Actualiza SOLO la fila "cliente" (lista de Home + el propio "cliente"
+  // dentro de la caché de detalle, si existe) sin tocar diagnostico ni
+  // visitas — a diferencia de aplicarClienteGuardado (más abajo), que viene
+  // de guardarClienteCompleto y sí trae ambos. Se usa después de crear/
+  // editar/borrar una visita: el backend recalcula ahí "tiposAplicados"
+  // (ver actualizarTiposDeCliente_ en Code.gs) y lo manda junto con la
+  // visita, para que el filtro por tipo en Home se actualice al instante sin
+  // recargar la lista entera.
+  const aplicarClienteActualizado = useCallback((cliente) => {
+    if (!cliente) return
+    setClientes((cs) => {
+      const idx = cs.findIndex((c) => c.id === cliente.id)
+      if (idx === -1) return cs
+      const copia = cs.slice()
+      copia[idx] = cliente
+      return copia
+    })
     setClienteDetalleCache((cache) => {
-      const entry = cache[visita.clienteId]
-      if (!entry) return cache
-      const sinEsa = entry.visitas.filter((v) => v.id !== visita.id)
-      return {
-        ...cache,
-        [visita.clienteId]: { ...entry, visitas: ordenarVisitas([...sinEsa, visita]) },
-      }
+      if (!cache[cliente.id]) return cache
+      return { ...cache, [cliente.id]: { ...cache[cliente.id], cliente } }
     })
   }, [])
 
-  const aplicarVisitaEliminada = useCallback((visitaId, clienteId) => {
-    setClienteDetalleCache((cache) => {
-      const entry = cache[clienteId]
-      if (!entry) return cache
-      return { ...cache, [clienteId]: { ...entry, visitas: entry.visitas.filter((v) => v.id !== visitaId) } }
-    })
-  }, [])
+  // Resultado de crear/editar una visita: upsert directo en la entrada de
+  // caché de ese cliente (sin refetch). Si ese cliente no tiene entrada
+  // cacheada (no debería pasar — el modal solo se abre desde su Detalle) no
+  // hace nada. "cliente" (opcional) es la fila de cliente ya recalculada que
+  // devuelve el backend junto con la visita — ver aplicarClienteActualizado.
+  const aplicarVisitaGuardada = useCallback(
+    (visita, cliente) => {
+      setClienteDetalleCache((cache) => {
+        const entry = cache[visita.clienteId]
+        if (!entry) return cache
+        const sinEsa = entry.visitas.filter((v) => v.id !== visita.id)
+        return {
+          ...cache,
+          [visita.clienteId]: { ...entry, visitas: ordenarVisitas([...sinEsa, visita]) },
+        }
+      })
+      aplicarClienteActualizado(cliente)
+    },
+    [aplicarClienteActualizado]
+  )
+
+  const aplicarVisitaEliminada = useCallback(
+    (visitaId, clienteId, cliente) => {
+      setClienteDetalleCache((cache) => {
+        const entry = cache[clienteId]
+        if (!entry) return cache
+        return { ...cache, [clienteId]: { ...entry, visitas: entry.visitas.filter((v) => v.id !== visitaId) } }
+      })
+      aplicarClienteActualizado(cliente)
+    },
+    [aplicarClienteActualizado]
+  )
 
   // Resultado de guardarClienteCompleto: actualiza la fila en la lista de
   // Home (o la agrega, si es alta) y la entrada de caché de ese cliente, si

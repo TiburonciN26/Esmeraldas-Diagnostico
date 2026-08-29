@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
-import { Menu, Users, LogOut } from 'lucide-react'
+import { Menu, Users, LogOut, Sun, Moon } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useSession } from '../../context/SessionContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { temaActual, aplicarTema } from '../../utils/theme'
 
-// Menú desplegable del header (botón "hamburguesa"). Por ahora solo tiene
-// "Clientes" (única sección de la app) y "Cerrar sesión" — antes vivía como
-// un botón suelto en el header de Home; se pensó como menú para poder
-// sumar más secciones más adelante sin ensuciar el header de íconos.
+// Menú desplegable del header (botón "hamburguesa"). Tiene "Clientes"
+// (única sección de la app), el toggle de modo oscuro/claro, y "Cerrar
+// sesión" — antes vivía como un botón suelto en el header de Home; se
+// pensó como menú para poder sumar más opciones más adelante sin ensuciar
+// el header de íconos.
 export default function AppMenu() {
   const [open, setOpen] = useState(false)
+  // Estado propio (no contexto): el tema es un atributo de <html>, no algo
+  // que otro componente de la app necesite leer — alcanza con que ESTE
+  // botón sepa qué mostrar. Se inicializa leyendo el atributo real en vez
+  // de asumir 'light', porque main.jsx ya lo aplicó (guardado o del
+  // sistema) antes de que este componente exista.
+  const [tema, setTema] = useState(temaActual)
   const wrapRef = useRef(null)
   const { goHome } = useApp()
   const { session, logout } = useSession()
@@ -38,6 +46,13 @@ export default function AppMenu() {
     goHome()
   }
 
+  const handleToggleTema = () => {
+    const nuevo = tema === 'dark' ? 'light' : 'dark'
+    aplicarTema(nuevo)
+    setTema(nuevo)
+    setOpen(false)
+  }
+
   // Misma confirmación que antes (el botón cae justo donde caen los taps
   // accidentales en un celular).
   const handleLogout = async () => {
@@ -64,6 +79,10 @@ export default function AppMenu() {
           <button type="button" className="app-menu__item" role="menuitem" onClick={handleClientes}>
             <Users size={16} strokeWidth={2.25} />
             Clientes
+          </button>
+          <button type="button" className="app-menu__item" role="menuitemcheckbox" aria-checked={tema === 'dark'} onClick={handleToggleTema}>
+            {tema === 'dark' ? <Sun size={16} strokeWidth={2.25} /> : <Moon size={16} strokeWidth={2.25} />}
+            {tema === 'dark' ? 'Modo claro' : 'Modo oscuro'}
           </button>
           <button
             type="button"
