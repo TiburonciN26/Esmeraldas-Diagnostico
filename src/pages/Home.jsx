@@ -1,11 +1,43 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, X, Filter } from 'lucide-react'
+import { Search, X, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { normalizarTexto } from '../utils/format'
 import { TIPOS_APLICACION } from '../data/constants'
-import TopBar from '../components/layout/TopBar'
 import ClienteCard from '../components/clientes/ClienteCard'
 import Button from '../components/ui/Button'
+
+// Criterios de orden de la lista de clientes (ver el botón "ordenar",
+// separado del filtro por tipo: uno RECORTA qué se ve, el otro reordena lo
+// que ya se ve — mezclarlos en un solo control confundiría). dirDefault es
+// la dirección con la que arranca cada criterio la primera vez que se
+// elige; volver a tocar el mismo criterio invierte la dirección en vez de
+// tener que elegir "ascendente/descendente" aparte.
+const OPCIONES_ORDEN = [
+  { criterio: 'nombre', label: 'Nombre', dirDefault: 'asc' },
+  { criterio: 'visitas', label: 'Cantidad de visitas', dirDefault: 'desc' },
+  { criterio: 'ultimaVisita', label: 'Última visita', dirDefault: 'desc' },
+  { criterio: 'fechaCreacion', label: 'Último cliente agregado', dirDefault: 'desc' },
+]
+
+// Por defecto, la lista se ve ordenada alfabéticamente (A-Z) — antes no
+// tenía ningún orden explícito (el que viniera del backend).
+const ORDEN_POR_DEFECTO = { criterio: 'nombre', direccion: 'asc' }
+
+function compararClientes(a, b, orden) {
+  const signo = orden.direccion === 'asc' ? 1 : -1
+  switch (orden.criterio) {
+    case 'nombre':
+      return signo * normalizarTexto(a.nombreCompleto).localeCompare(normalizarTexto(b.nombreCompleto))
+    case 'visitas':
+      return signo * ((Number(a.cantidadVisitas) || 0) - (Number(b.cantidadVisitas) || 0))
+    case 'ultimaVisita':
+      return signo * String(a.ultimaVisitaFecha || '').localeCompare(String(b.ultimaVisitaFecha || ''))
+    case 'fechaCreacion':
+      return signo * String(a.fechaCreacion || '').localeCompare(String(b.fechaCreacion || ''))
+    default:
+      return 0
+  }
+}
 
 export default function Home() {
   const {
@@ -20,13 +52,23 @@ export default function Home() {
   // Filtra por si el cliente TUVO ALGUNA VEZ una visita de ese tipo —
   // "tiposAplicados" es un texto separado por comas con todos los tipos
   // distintos de su historial, recalculado solo en el backend cada vez que
-  // se crea/edita/borra una visita (ver actualizarTiposDeCliente_ en
+  // se crea/edita/borra una visita (ver recalcularAgregadosDeCliente_ en
   // Code.gs) — así el filtro no tiene que leer el historial completo de
   // visitas en cada carga de Home, solo lo que ya viene en la fila del
   // cliente. '' = sin filtro (todos).
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroAbierto, setFiltroAbierto] = useState(false)
   const filtroRef = useRef(null)
+
+  // Siempre hay un criterio activo (arranca en ORDEN_POR_DEFECTO, A-Z) —
+  // ya no existe un estado "sin ordenar".
+  const [orden, setOrden] = useState(ORDEN_POR_DEFECTO)
+  const [ordenAbierto, setOrdenAbierto] = useState(false)
+  const ordenRef = useRef(null)
+  // El botón solo se ve "activo" (fondo oscuro) cuando el orden difiere
+  // del de por defecto — evita que se vea permanentemente resaltado sin
+  // que la usuaria haya tocado nada.
+  const ordenEsPorDefecto = orden.criterio === ORDEN_POR_DEFECTO.criterio && orden.direccion === ORDEN_POR_DEFECTO.direccion
 
   // Cierra al hacer clic afuera o con Escape — mismo criterio que AppMenu.
   useEffect(() => {
@@ -45,6 +87,22 @@ export default function Home() {
     }
   }, [filtroAbierto])
 
+  useEffect(() => {
+    if (!ordenAbierto) return
+    const onClickFuera = (e) => {
+      if (ordenRef.current && !ordenRef.current.contains(e.target)) setOrdenAbierto(false)
+    }
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOrdenAbierto(false)
+    }
+    document.addEventListener('mousedown', onClickFuera)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClickFuera)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [ordenAbierto])
+
   // La lista vive en AppContext (no acá) precisamente para que, al volver a
   // Home, ya esté disponible al instante en vez de repetir el "Cargando…".
   const loading = !clientesLoaded && !clientesError
@@ -60,20 +118,33 @@ export default function Home() {
     setFiltroAbierto(false)
   }
 
+  // Elegir un criterio no seleccionado arranca en su dirección por defecto;
+  // volver a tocar el mismo criterio invierte la dirección (asc <-> desc)
+  // en vez de tener que elegir "ascendente/descendente" por separado.
+  const handleElegirOrden = (criterio) => {
+    setOrden((actual) => {
+      if (actual.criterio === criterio) {
+        return { criterio, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' }
+      }
+      const opcion = OPCIONES_ORDEN.find((o) => o.criterio === criterio)
+      return { criterio, direccion: opcion.dirDefault }
+    })
+    setOrdenAbierto(false)
+  }
+
   const clientesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda.trim())
-    return clientes.filter((c) => {
+    const filtrados = clientes.filter((c) => {
       const coincideTexto =
         !q || normalizarTexto(c.nombreCompleto).includes(q) || normalizarTexto(c.telefono).includes(q)
       const coincideTipo = !filtroTipo || (c.tiposAplicados || '').split(',').includes(filtroTipo)
       return coincideTexto && coincideTipo
     })
-  }, [clientes, busqueda, filtroTipo])
+    return [...filtrados].sort((a, b) => compararClientes(a, b, orden))
+  }, [clientes, busqueda, filtroTipo, orden])
 
   return (
     <>
-      <TopBar title="Clientes" bigTitle showLogo menu />
-
       {!loading && clientes.length > 0 && (
         <div className="search-bar-row">
           <div className="search-bar">
@@ -139,6 +210,58 @@ export default function Home() {
               </div>
             )}
           </div>
+
+          {/* Ordenar — control aparte del filtro de arriba a propósito: uno
+              recorta la lista, el otro solo la reordena. Mismo lenguaje
+              visual (círculo + desplegable), clases de .filtro-tipo
+              reusadas tal cual. */}
+          <div className="orden-clientes" ref={ordenRef}>
+            <button
+              type="button"
+              className={`filtro-tipo__trigger ${!ordenEsPorDefecto ? 'filtro-tipo__trigger--activo' : ''}`}
+              aria-label={`Ordenado por ${OPCIONES_ORDEN.find((o) => o.criterio === orden.criterio)?.label}. Abrir orden`}
+              aria-haspopup="true"
+              aria-expanded={ordenAbierto}
+              onClick={() => setOrdenAbierto((v) => !v)}
+            >
+              {ordenEsPorDefecto ? (
+                <ArrowUpDown size={17} strokeWidth={2.25} />
+              ) : orden.direccion === 'asc' ? (
+                <ArrowUp size={17} strokeWidth={2.25} />
+              ) : (
+                <ArrowDown size={17} strokeWidth={2.25} />
+              )}
+            </button>
+
+            {ordenAbierto && (
+              <div className="filtro-tipo__dropdown" role="menu">
+                {OPCIONES_ORDEN.map((op) => {
+                  const activo = orden.criterio === op.criterio
+                  return (
+                    <button
+                      key={op.criterio}
+                      type="button"
+                      className={`filtro-tipo__item ${activo ? 'filtro-tipo__item--activo' : ''}`}
+                      role="menuitemradio"
+                      aria-checked={activo}
+                      onClick={() => handleElegirOrden(op.criterio)}
+                    >
+                      {op.label}
+                      {activo && (
+                        <span className="filtro-tipo__item-flecha" aria-hidden="true">
+                          {orden.direccion === 'asc' ? (
+                            <ArrowUp size={13} strokeWidth={2.5} />
+                          ) : (
+                            <ArrowDown size={13} strokeWidth={2.5} />
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -196,7 +319,7 @@ export default function Home() {
         </div>
       )}
 
-      <Button variant="primary" className="fab" onClick={handleNuevo}>
+      <Button variant="primary" className="fab btn--borde-gris" onClick={handleNuevo}>
         + Nuevo cliente
       </Button>
     </>

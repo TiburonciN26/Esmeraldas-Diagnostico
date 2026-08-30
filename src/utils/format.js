@@ -1,11 +1,12 @@
 // Utilidades de formato y texto compartidas por toda la app.
 
-// Formatea un precio numérico como moneda simple ($1.500). Deja pasar
-// strings no numéricos tal cual (por si en el futuro se guarda "s/d", etc.).
+// Formatea un precio numérico como moneda simple (S/ 1.500, soles). Deja
+// pasar strings no numéricos tal cual (por si en el futuro se guarda
+// "s/d", etc.).
 export function fmtPrecio(v) {
   if (v === '' || v == null) return ''
   const n = Number(v)
-  return Number.isNaN(n) ? String(v) : `$${n.toLocaleString('es-AR')}`
+  return Number.isNaN(n) ? String(v) : `S/ ${n.toLocaleString('es-AR')}`
 }
 
 // Convierte una fecha ISO (YYYY-MM-DD) a formato local dd/mm/aaaa para

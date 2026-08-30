@@ -615,7 +615,7 @@ export default function VisitaModal() {
           </Field>
 
           <Field
-            label="Oxígeno"
+            label="Oxígenta"
             required
             error={errors[campoOxidante]}
             htmlFor={idOxidante}
@@ -701,7 +701,7 @@ export default function VisitaModal() {
             </Field>
 
             <Field
-              label="Oxígeno"
+              label="Oxígenta"
               required
               error={errors.oxidanteMediosAPuntas}
               htmlFor="v-omed"

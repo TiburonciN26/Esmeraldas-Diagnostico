@@ -5,3 +5,4 @@
 export * from './clientesService'
 export * from './diagnosticosService'
 export * from './visitasService'
+export * from './usuarioService'

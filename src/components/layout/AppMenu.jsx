@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Menu, Users, LogOut, Sun, Moon } from 'lucide-react'
+import { Menu, Users, LogOut, Sun, Moon, CircleUserRound } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useSession } from '../../context/SessionContext'
 import { useConfirm } from '../../context/ConfirmContext'
+import { useToast } from '../../context/ToastContext'
 import { temaActual, aplicarTema } from '../../utils/theme'
+import { comprimirImagen } from '../../utils/image'
 
 // Menú desplegable del header (botón "hamburguesa"). Tiene "Clientes"
 // (única sección de la app), el toggle de modo oscuro/claro, y "Cerrar
@@ -20,8 +22,10 @@ export default function AppMenu() {
   const [tema, setTema] = useState(temaActual)
   const wrapRef = useRef(null)
   const { goHome } = useApp()
-  const { session, logout } = useSession()
+  const { session, logout, actualizarFoto } = useSession()
   const confirmar = useConfirm()
+  const toast = useToast()
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
 
   // Cierra al hacer clic afuera o con Escape — mismo criterio que el resto
   // de los overlays de la app (Modal, ConfirmContext).
@@ -46,11 +50,31 @@ export default function AppMenu() {
     goHome()
   }
 
+  // No cierra el desplegable (a diferencia de las otras opciones): a
+  // pedido, para poder mirar el resultado del cambio de tema sin tener
+  // que reabrir el menú.
   const handleToggleTema = () => {
     const nuevo = tema === 'dark' ? 'light' : 'dark'
     aplicarTema(nuevo)
     setTema(nuevo)
-    setOpen(false)
+  }
+
+  // Sube la foto al backend (columna "foto" en la pestaña "usuario", ver
+  // SessionContext.jsx) — así se ve igual en cualquier navegador/dispositivo
+  // donde se loguee esta cuenta, no solo en el que la subió.
+  const handleFotoPerfil = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSubiendoFoto(true)
+    try {
+      const dataUrl = await comprimirImagen(file, { maxDim: 256, calidad: 0.8 })
+      await actualizarFoto(dataUrl)
+    } catch (err) {
+      console.error('Error subiendo la foto de perfil:', err)
+      toast('No se pudo subir la foto. Probá de nuevo.')
+    } finally {
+      setSubiendoFoto(false)
+    }
   }
 
   // Misma confirmación que antes (el botón cae justo donde caen los taps
@@ -76,13 +100,50 @@ export default function AppMenu() {
 
       {open && (
         <div className="app-menu__dropdown" role="menu">
+          <div className="app-menu__perfil">
+            <div className="app-menu__avatar">
+              {session?.foto ? (
+                <img src={session.foto} alt="" className="app-menu__avatar-img" />
+              ) : (
+                <CircleUserRound size={34} strokeWidth={1.5} />
+              )}
+            </div>
+            <div className="app-menu__perfil-texto">
+              <div className="app-menu__perfil-nombre">{session?.nombre}</div>
+              {session?.rol && <div className="app-menu__perfil-rol">{session.rol}</div>}
+            </div>
+          </div>
+          <input
+            type="file"
+            id="app-menu-foto"
+            accept="image/*"
+            className="sr-only"
+            onChange={handleFotoPerfil}
+            disabled={subiendoFoto}
+          />
+          <label htmlFor="app-menu-foto" className="app-menu__foto-boton">
+            {subiendoFoto ? 'Subiendo…' : 'Cargar foto'}
+          </label>
+
+          <div className="app-menu__separador" role="separator" />
+
           <button type="button" className="app-menu__item" role="menuitem" onClick={handleClientes}>
             <Users size={16} strokeWidth={2.25} />
             Clientes
           </button>
-          <button type="button" className="app-menu__item" role="menuitemcheckbox" aria-checked={tema === 'dark'} onClick={handleToggleTema}>
-            {tema === 'dark' ? <Sun size={16} strokeWidth={2.25} /> : <Moon size={16} strokeWidth={2.25} />}
-            {tema === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+          <button
+            type="button"
+            className="app-menu__item"
+            role="menuitemcheckbox"
+            aria-checked={tema === 'dark'}
+            onClick={handleToggleTema}
+          >
+            <span className="app-menu__tema-icono" key={`icono-${tema}`}>
+              {tema === 'dark' ? <Sun size={16} strokeWidth={2.25} /> : <Moon size={16} strokeWidth={2.25} />}
+            </span>
+            <span className="app-menu__tema-texto" key={`texto-${tema}`}>
+              {tema === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+            </span>
           </button>
           <button
             type="button"

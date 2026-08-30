@@ -63,6 +63,7 @@ var ACCIONES_ESCRITURA = {
   createVisita: true,
   updateVisita: true,
   deleteVisita: true,
+  actualizarFotoUsuario: true,
 }
 
 function doPost(e) {
@@ -90,9 +91,21 @@ function doPost(e) {
     try {
       switch (body.action) {
         // Solo valida credenciales y devuelve quién es (para el login del
-        // frontend). No expone la contraseña de vuelta.
+        // frontend). No expone la contraseña de vuelta. "foto" es opcional
+        // (columna nueva en "usuario") — si no existe la columna, llega
+        // undefined y el frontend simplemente no muestra ninguna.
         case 'login':
-          result = { correo: usuario.correo, rol: usuario.rol, nombre: usuario.nombre }
+          result = { correo: usuario.correo, rol: usuario.rol, nombre: usuario.nombre, foto: usuario.foto || '' }
+          break
+
+        // Guarda la foto de perfil de QUIEN está logueada (nunca de otro
+        // correo, aunque el body lo pidiera — se usa "usuario.correo", ya
+        // autenticado más arriba). Requiere que la pestaña "usuario" tenga
+        // una columna "foto"; si no existe, actualizarFotoUsuario_ tira un
+        // error legible en vez de fallar en silencio.
+        case 'actualizarFotoUsuario':
+          actualizarFotoUsuario_(usuario.correo, data.foto || '')
+          result = { foto: data.foto || '' }
           break
 
         // Sin paginado: manda TODOS los clientes activos en un solo payload.
@@ -145,9 +158,18 @@ function doPost(e) {
             clienteFinal = updateRowById_(SHEETS.CLIENTE, clienteId, clienteData)
           } else {
             clienteId = newId_('c')
+            // fechaCreacion: para poder ordenar la lista de Home por
+            // "agregado más reciente/antiguo" (ver ORDEN_CLIENTES en
+            // Home.jsx) — clientes de antes de este campo simplemente
+            // quedan sin fecha, no rompe nada (los agrupa como "más
+            // antiguos" al ordenar).
             clienteFinal = appendRow_(
               SHEETS.CLIENTE,
-              mergeForce_(clienteData, { id: clienteId, activo: true })
+              mergeForce_(clienteData, {
+                id: clienteId,
+                activo: true,
+                fechaCreacion: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+              })
             )
           }
 
@@ -178,11 +200,12 @@ function doPost(e) {
         // "cliente" para el borrado) en vez de la visita sola — cualquier
         // alta/edición/baja de una visita puede cambiar qué tipos de
         // aplicación tiene ese cliente (agregar uno nuevo, o hacer que ya no
-        // tenga ninguna con el tipo que se acaba de borrar/editar), así que
-        // junto con la visita se manda también la fila de "cliente" ya
-        // actualizada con su "tiposAplicados" recalculado (ver
-        // actualizarTiposDeCliente_ más abajo) — el frontend la aplica
-        // directo a la lista de Home (filtro por tipo), sin tener que
+        // tenga ninguna con el tipo que se acaba de borrar/editar), cuántas
+        // visitas tiene, y cuál es la más reciente, así que junto con la
+        // visita se manda también la fila de "cliente" ya actualizada con
+        // esos 3 campos recalculados (ver recalcularAgregadosDeCliente_ más
+        // abajo) — el frontend la aplica directo a la lista de Home (filtro
+        // por tipo, contador de visitas, última fecha), sin tener que
         // recargarla entera para verlo.
         case 'createVisita': {
           if (!soloActivo_(findById_(SHEETS.CLIENTE, body.clienteId))) {
@@ -215,7 +238,7 @@ function doPost(e) {
             borrarFotoSiExiste_(conFoto.fotoSubidaId)
             throw writeErr
           }
-          result = { visita: visitaCreada, cliente: actualizarTiposDeCliente_(body.clienteId) }
+          result = { visita: visitaCreada, cliente: recalcularAgregadosDeCliente_(body.clienteId) }
           break
         }
         case 'updateVisita': {
@@ -233,13 +256,13 @@ function doPost(e) {
           }
           result = {
             visita: visitaActualizada,
-            cliente: actualizarTiposDeCliente_(visitaActualizada.clienteId),
+            cliente: recalcularAgregadosDeCliente_(visitaActualizada.clienteId),
           }
           break
         }
         case 'deleteVisita': {
           var visitaBorrada = updateRowById_(SHEETS.VISITA, body.id, { activo: false })
-          result = { cliente: actualizarTiposDeCliente_(visitaBorrada.clienteId) }
+          result = { cliente: recalcularAgregadosDeCliente_(visitaBorrada.clienteId) }
           break
         }
 
@@ -310,6 +333,34 @@ function usuariosCacheados_() {
   return usuarios
 }
 
+// Escribe la foto de perfil (data URL JPEG comprimida, ver comprimirImagen
+// en AppMenu.jsx — chica, entra cómoda en una celda) en la fila de ESE
+// correo. No usa updateRowById_ (pide columna "id", que "usuario" no
+// necesariamente tiene) — acá el usuario se ubica por "correo" directo.
+// Invalida tanto el caché genérico de la hoja como el de usuariosCacheados_
+// (clave aparte, TTL propio de 5 min) para que la foto nueva se vea de
+// inmediato en el próximo login/carga, no recién cuando venza ese caché.
+function actualizarFotoUsuario_(correo, foto) {
+  var sh = sheet_(SHEETS.USUARIO)
+  var values = sh.getDataRange().getValues()
+  var headers = values[0].map(String)
+  var correoCol = headers.indexOf('correo')
+  var fotoCol = headers.indexOf('foto')
+  if (correoCol === -1) throw new Error('La pestaña "usuario" no tiene columna "correo".')
+  if (fotoCol === -1) throw new Error('La pestaña "usuario" no tiene columna "foto". Agregala primero.')
+
+  var correoNorm = String(correo || '').trim().toLowerCase()
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][correoCol]).trim().toLowerCase() === correoNorm) {
+      sh.getRange(i + 1, fotoCol + 1).setValue(foto)
+      invalidarCache_(SHEETS.USUARIO)
+      CacheService.getScriptCache().remove('usuarios')
+      return
+    }
+  }
+  throw new Error('No se encontró el usuario "' + correo + '".')
+}
+
 function visitasDeCliente_(clienteId) {
   return findByField_(SHEETS.VISITA, 'clienteId', clienteId)
     .filter(function (v) {
@@ -321,22 +372,28 @@ function visitasDeCliente_(clienteId) {
 }
 
 // Recalcula desde cero (no se "resta"/"suma" incrementalmente, para estar
-// bien ante cualquier orden de altas/ediciones/bajas) la lista de tipos de
-// aplicación DISTINTOS entre todas las visitas activas del cliente, y la
-// guarda en su fila, columna "tiposAplicados" (texto separado por comas,
-// ej. "Rayitos,Retoque de raíz" — ningún tipo de TIPOS_APLICACION lleva
-// coma, así que separar por "," es seguro). Filtro por tipo en Home.jsx:
-// se calcula acá (al escribir una visita), no al leer la lista de
-// clientes, a propósito — así ese filtro no paga el costo de recorrer TODA
-// la hoja "visita" (la que más crece con el tiempo) en cada carga de Home,
-// solo la porción de un cliente puntual, en el momento en que ya se está
+// bien ante cualquier orden de altas/ediciones/bajas) 3 campos agregados
+// del cliente a partir de sus visitas activas, y los guarda en su fila:
+// - tiposAplicados: tipos de aplicación DISTINTOS entre todas sus visitas
+//   (texto separado por comas, ej. "Rayitos,Retoque de raíz" — ningún tipo
+//   de TIPOS_APLICACION lleva coma, así que separar por "," es seguro).
+//   Filtro por tipo en Home.jsx.
+// - cantidadVisitas: cuántas visitas activas tiene. Contador en la tarjeta
+//   de Home.jsx.
+// - ultimaVisitaFecha: la fecha de la más reciente (visitasDeCliente_ ya
+//   las trae ordenadas desc). Se muestra en la tarjeta de Home.jsx y sirve
+//   para el orden "última visita" del selector de orden.
+// Los 3 se calculan acá (al escribir una visita), no al leer la lista de
+// clientes, a propósito — así Home no paga el costo de recorrer TODA la
+// hoja "visita" (la que más crece con el tiempo) en cada carga, solo la
+// porción de un cliente puntual, en el momento en que ya se está
 // escribiendo su visita de todos modos.
 //
-// Si "tiposAplicados" todavía no existe como columna en la pestaña
-// "cliente", updateRowById_ simplemente no la escribe en ningún lado
-// (mismo comportamiento que cualquier otro campo whitelisteado sin columna
-// real), sin romper nada.
-function actualizarTiposDeCliente_(clienteId) {
+// Si alguna de las 3 columnas todavía no existe en la pestaña "cliente",
+// updateRowById_ simplemente no la escribe en ningún lado (mismo
+// comportamiento que cualquier otro campo whitelisteado sin columna real),
+// sin romper nada.
+function recalcularAgregadosDeCliente_(clienteId) {
   var visitas = visitasDeCliente_(clienteId) // ya ordenadas por fecha desc
   var vistos = {}
   var tipos = []
@@ -347,7 +404,11 @@ function actualizarTiposDeCliente_(clienteId) {
       tipos.push(tipo)
     }
   }
-  return updateRowById_(SHEETS.CLIENTE, clienteId, { tiposAplicados: tipos.join(',') })
+  return updateRowById_(SHEETS.CLIENTE, clienteId, {
+    tiposAplicados: tipos.join(','),
+    cantidadVisitas: visitas.length,
+    ultimaVisitaFecha: visitas.length ? visitas[0].fecha : '',
+  })
 }
 
 // Al desactivar un cliente, desactiva en cascada sus visitas — si no,

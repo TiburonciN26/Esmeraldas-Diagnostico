@@ -13,8 +13,8 @@
      fondo, para que un campo vacío se distinga sin necesitar más borde. */
   --color-input-bg: #f8fafc;
 
-  --color-primary: #141414;
-  --color-primary-dark: #000000;
+  --color-primary: #111827;
+  --color-primary-dark: #0b1120;
   --color-primary-soft: #f1f1f1;
   /* Texto/ícono sobre un fondo --color-primary (botones primarios, badges,
      toggles activos) — separado de --color-primary porque en modo oscuro
@@ -42,17 +42,14 @@
   --color-cumple-text: #a6790a;
 
   --color-skeleton-highlight: #f0f0f0;
-  --color-ultima-bg: #fff5fa;
-  --color-ultima-bg-hover: #ffeaf5;
+  /* Gris neutro (no rosa) a propósito: la fila ya se distingue con el
+     borde izquierdo y el badge "Última", ambos en rosa — un fondo TAMBIÉN
+     rosa quedaba recargado. */
+  --color-ultima-bg: #f1f1f1;
+  --color-ultima-bg-hover: #e6e6e6;
   --color-select-bg: #fff5fa;
   --color-select-bg-hover: #ffeaf5;
   --color-topbar-bg: rgba(255, 255, 255, 0.85);
-  /* Overlay que difumina el fondo al abrir un <select> (ver más abajo,
-     body.select-activo::after) — variable en vez de rgba fijo porque en
-     modo oscuro un negro al 32% de opacidad sobre un fondo ya casi negro
-     (--color-bg oscuro) no se nota nada; ahí hace falta más opacidad para
-     lograr el mismo contraste relativo. */
-  --overlay-dim: rgba(20, 20, 20, 0.32);
   /* Flecha del <select> — no se puede referenciar una variable CSS DENTRO
      de un data URI, así que el SVG completo (con su color de trazo ya
      puesto) vive en esta variable para poder cambiarlo entero en modo
@@ -137,13 +134,12 @@
   --color-cumple-text: #ffd873;
 
   --color-skeleton-highlight: #313134;
-  --color-ultima-bg: #2a1620;
-  --color-ultima-bg-hover: #38202c;
+  --color-ultima-bg: #2a292d;
+  --color-ultima-bg-hover: #333238;
   --color-select-bg: #29262f;
   --color-select-bg-hover: #322d3a;
   --color-topbar-bg: rgba(23, 23, 26, 0.85);
   --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23f2f0f0' stroke-width='2.2'%3E%3Cpath d='M6 8l4 4 4-4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  --overlay-dim: rgba(0, 0, 0, 0.6);
 
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.65);
@@ -238,34 +234,6 @@ button {
   font-size: var(--fs-2xl);
 }
 
-.topbar__subtitle {
-  font-size: var(--fs-xs);
-  color: var(--color-text-soft);
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.topbar__back {
-  background: var(--color-primary-soft);
-  color: var(--color-text);
-  border: none;
-  border-radius: 50%;
-  width: 38px;
-  height: 38px;
-  font-size: var(--fs-lg);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-}
-
-.topbar__back:hover {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
 .topbar__spacer {
   flex: 1;
 }
@@ -321,7 +289,7 @@ button {
   top: calc(100% + 8px);
   left: 0;
   z-index: 30;
-  min-width: 180px;
+  min-width: 200px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -331,6 +299,103 @@ button {
   flex-direction: column;
   gap: 2px;
   animation: field-in 0.15s ease;
+}
+
+/* Foto + nombre + rol de quien está logueado, arriba del todo del menú. */
+.app-menu__perfil {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 2px;
+}
+
+.app-menu__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-text-soft);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.app-menu__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-menu__perfil-texto {
+  min-width: 0;
+}
+
+.app-menu__perfil-nombre {
+  font-weight: 700;
+  font-size: var(--fs-base);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-menu__perfil-rol {
+  font-size: var(--fs-xs);
+  color: var(--color-text-soft);
+  text-transform: capitalize;
+}
+
+/* Un solo botón, sin ningún texto adicional (a pedido) — carga y
+   comprime la foto (ver comprimirImagen en AppMenu.jsx) y la sube al
+   backend (columna "foto" en la pestaña "usuario"), así se ve igual en
+   cualquier dispositivo donde se loguee esta cuenta. */
+.app-menu__foto-boton {
+  display: block;
+  text-align: center;
+  margin: 2px 8px 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.app-menu__foto-boton:hover {
+  background: var(--color-primary-soft);
+}
+
+.app-menu__separador {
+  height: 1px;
+  background: var(--color-border);
+  margin: 6px 4px;
+}
+
+/* Ícono/texto del toggle de tema: entran con una animación corta en vez de
+   cambiar de golpe — la key en {tema} (ver AppMenu.jsx) remonta el span
+   en cada cambio, así la animación se reinicia cada vez. */
+@keyframes app-menu-tema-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-menu__tema-icono {
+  display: inline-flex;
+  animation: app-menu-tema-in 0.25s ease;
+}
+
+.app-menu__tema-texto {
+  display: inline-block;
+  animation: app-menu-tema-in 0.25s ease;
 }
 
 .app-menu__item {
@@ -357,7 +422,7 @@ button {
 .btn {
   border: 1.5px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 10px 16px;
+  padding: 8px 13px;
   font-size: var(--fs-base);
   font-weight: 600;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
@@ -387,8 +452,9 @@ button {
   border-color: var(--color-rosado-pastel);
 }
 
-/* #141414 -> #000000 es casi imperceptible por sí solo; el glow rosa
-   (mismo patrón que los focus rings de la app) es lo que realmente se nota. */
+/* --color-primary -> --color-primary-dark es casi imperceptible por sí
+   solo; el glow rosa (mismo patrón que los focus rings de la app) es lo
+   que realmente se nota. */
 .btn--primary:hover {
   background: var(--color-primary-dark);
   box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.25);
@@ -399,6 +465,13 @@ button {
    VisitaModal.jsx). */
 .btn--sin-borde-rosa {
   border-color: transparent;
+}
+
+/* Variante con borde gris neutro en vez del rosa pastel de .btn--primary —
+   usada donde se pidió puntualmente sacar el rosa pero sin dejarlo del
+   todo invisible (ver el botón "+ Nuevo cliente" en Home.jsx). */
+.btn--borde-gris {
+  border-color: var(--color-border);
 }
 
 .btn--ghost {
@@ -412,20 +485,22 @@ button {
 }
 
 .btn--danger {
-  background: var(--color-danger-soft);
+  background: transparent;
   color: var(--color-danger);
-  border-color: var(--color-danger-soft);
+  border-color: var(--color-danger);
 }
 
 .btn--danger:hover {
-  background: var(--color-danger-soft-hover);
+  background: var(--color-danger-soft);
 }
 
-/* Acción de WhatsApp: borde pastel menta para destacarla entre las acciones */
+/* Acción de WhatsApp: borde gris neutro (como el resto de los botones
+   ghost), el verde queda solo en el ícono adentro — a pedido, antes era
+   al revés (borde verde, ícono del color de texto normal). */
 .btn--whatsapp {
   background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--accent-mint);
+  color: var(--accent-mint);
+  border-color: var(--color-border);
 }
 
 .btn--whatsapp:hover {
@@ -474,6 +549,36 @@ button {
   font-size: var(--fs-base);
 }
 
+/* Botón flotante "Volver" (ClienteDetalle.jsx) — mismo lenguaje que .fab
+   (posición fija, misma sombra) y circular en vez de pastilla con texto.
+   Mismo lado (derecha) que "+ Nueva visita"/"+ Nuevo cliente" — a pedido,
+   antes iba a la izquierda. bottom/right usan el mismo valor (24px) a
+   propósito, para que el espaciado hacia abajo y hacia la derecha sea
+   igual. Estilo neutro (no --color-primary): es una acción de navegación
+   secundaria, no una acción principal como crear. */
+.fab-volver {
+  position: fixed;
+  right: max(24px, calc((100vw - var(--maxw)) / 2 + 24px));
+  bottom: 24px;
+  z-index: 30;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fab-volver:hover {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+
 /* ---------- Cards ---------- */
 .card {
   background: var(--color-surface);
@@ -503,6 +608,128 @@ button {
 .detalle-section:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* ---------- Detalle de la visita: rediseño (VisitaDetalleModal.jsx) ----------
+   Clases propias (no reusa .dato/.dato-grid, que también usa Detalle de
+   cliente) para poder rediseñar este modal sin arriesgar el otro. */
+.detalle-visita__titulo {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--color-text-soft);
+  margin-bottom: 12px;
+}
+
+.detalle-visita__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+}
+
+@media (min-width: 560px) {
+  .detalle-visita__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.detalle-visita__dato {
+  min-width: 0;
+}
+
+.detalle-visita__label {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--color-text-soft);
+  margin-bottom: 2px;
+}
+
+.detalle-visita__label::after {
+  content: ':';
+}
+
+.detalle-visita__valor {
+  display: block;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+/* Tarjeta por fórmula (raíz / medios a puntas) — fondo levemente distinto
+   del blanco del modal para que se lea como un bloque propio, sin la
+   sombra/acento de color de .visita-seccion (esa combinación ya se probó
+   acá arriba y le restaba ancho a la fila de fórmula). */
+.detalle-visita__formula-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+}
+
+.detalle-visita__formula-card + .detalle-visita__formula-card {
+  margin-top: 12px;
+}
+
+.detalle-visita__formula-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.detalle-visita__formula-nombre {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.detalle-visita__amonio {
+  font-size: var(--fs-sm);
+  color: var(--color-text-soft);
+  white-space: nowrap;
+}
+
+.detalle-visita__amonio strong {
+  color: var(--color-text);
+}
+
+/* Mezcla/Oxígeno/Onzas/Tiempo dentro de una tarjeta de fórmula: a
+   diferencia de las otras secciones (4 columnas iguales), acá "Mezcla"
+   puede ser un texto largo ("20 gr 5.0 + 20gr 7.0") mientras que
+   Oxígeno/Onzas/Tiempo son valores cortos — con columnas iguales, Mezcla
+   rompía a una segunda línea con espacio de sobra sin usar en las otras 3.
+   flex (no grid), cada uno con su ancho natural (ninguno crece) y
+   justify-content: space-between reparte el espacio sobrante ENTRE los 4,
+   no aplastados contra el borde derecho — antes Mezcla sola absorbía todo
+   ese espacio (flex:1), dejando un hueco vacío enorme antes de los otros
+   3, que quedaban apretados al final. */
+.detalle-visita__grid--formula {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 24px;
+  margin-top: 12px;
+}
+
+.detalle-visita__grid--formula > .detalle-visita__dato {
+  flex: 0 0 auto;
+}
+
+.detalle-visita__nota-caja {
+  margin-top: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: var(--fs-base);
+  color: var(--color-text);
+  min-height: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Título de tarjeta (Detalle de cliente): más grande que las claves de
@@ -561,8 +788,15 @@ button {
   color: var(--color-cumple-text);
 }
 
-.cliente-card__nombre {
+.cliente-card__nombre-fila {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cliente-card__nombre {
   min-width: 0;
   font-weight: 600;
   font-size: var(--fs-md);
@@ -571,18 +805,29 @@ button {
   text-overflow: ellipsis;
 }
 
-.cliente-card__tel {
+/* Contador de visitas, pegado al nombre — reemplaza al teléfono (que ya
+   no se muestra en la tarjeta, ver .cliente-card__fecha más abajo). */
+.cliente-card__contador {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  color: var(--color-text-soft);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-full);
+  padding: 3px 7px;
+}
+
+/* Última fecha de visita — ocupa el lugar donde antes iba el teléfono. */
+.cliente-card__fecha {
   display: flex;
   align-items: center;
   gap: 5px;
   flex-shrink: 0;
   font-size: var(--fs-sm);
   color: var(--color-text-soft);
-}
-
-.cliente-card__tel svg {
-  flex-shrink: 0;
-  color: var(--color-rosado-pastel);
 }
 
 .cliente-card__acciones {
@@ -653,14 +898,21 @@ button {
 
 .search-bar__input:focus {
   outline: none;
-  border-color: var(--color-rosa-fuerte);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.25);
+  border-color: var(--color-text-soft);
+  box-shadow: 0 0 0 3px rgba(109, 109, 109, 0.15);
 }
 
 /* Filtro por tipo de aplicación (Home, al lado del buscador) — filtra por
    el tipo de la ÚLTIMA visita de cada cliente. Mismo lenguaje visual que
    .app-menu (ícono circular + desplegable con click-afuera/Escape). */
 .filtro-tipo {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Selector de orden (Home.jsx) — mismo lenguaje visual que .filtro-tipo,
+   contenedor propio solo para no mezclar nombres con el filtro por tipo. */
+.orden-clientes {
   position: relative;
   flex-shrink: 0;
 }
@@ -678,7 +930,7 @@ button {
 }
 
 .filtro-tipo__trigger:hover {
-  border-color: var(--color-rosado-pastel);
+  border-color: var(--color-text-soft);
   color: var(--color-text);
 }
 
@@ -688,6 +940,15 @@ button {
 .filtro-tipo__trigger--activo {
   background: var(--color-primary);
   border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* Bug real: ".filtro-tipo__trigger:hover" (arriba) tiene la misma
+   especificidad que "--activo" y ganaba al pasar el mouse por encima del
+   botón ya activo, volviendo el ícono oscuro sobre su propio fondo oscuro
+   (invisible). Esta regla, declarada después y con la misma especificidad
+   (clase + :hover), gana el empate y mantiene el ícono claro. */
+.filtro-tipo__trigger--activo:hover {
   color: var(--color-on-primary);
 }
 
@@ -711,6 +972,10 @@ button {
 }
 
 .filtro-tipo__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
   padding: 10px 12px;
   border: none;
@@ -721,6 +986,13 @@ button {
   font-weight: 600;
   text-align: left;
   transition: background 0.15s, color 0.15s;
+}
+
+/* Flecha de dirección (asc/desc) junto al criterio de orden activo — ver
+   el selector de orden en Home.jsx (reusa .filtro-tipo__item tal cual). */
+.filtro-tipo__item-flecha {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .filtro-tipo__item:hover {
@@ -849,28 +1121,22 @@ button {
   letter-spacing: 0.04em;
   color: var(--color-text-soft);
   font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
+.dato__icon {
+  display: inline-flex;
+  margin-right: 4px;
+  color: var(--color-text-soft);
 }
 
 .dato__v {
-  font-size: var(--fs-base);
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--fs-sm);
+  font-weight: 700;
   margin-top: 2px;
   word-break: break-word;
-}
-
-/* Variante "en fila": campo y dato juntos, pegados (no en los dos extremos
-   de la celda — con space-between quedaban separados por un hueco enorme
-   en pantallas anchas, sobre todo en tablet donde .dato-grid ya da bastante
-   ancho por celda). El "gap" chico es lo que controla la distancia entre
-   la etiqueta y su valor. */
-.dato-grid--split .dato {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp-2);
-}
-
-.dato-grid--split .dato__k {
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 /* Variante "en par": 2 columnas fijas (sin breakpoint), para campos cortos
@@ -879,22 +1145,6 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-3);
-}
-
-/* Fórmula + oxígeno + tiempo, de solo lectura, en una sola fila (ver
-   VisitaDetalleModal). 2fr 1fr 1fr (no 3 columnas iguales) porque la
-   fórmula suele ser el texto más largo de los 3 — con columnas iguales
-   rompía a una segunda línea mientras oxígeno y tiempo dejaban espacio
-   vacío de sobra sin usar. */
-.dato-grid--trio {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: var(--sp-3);
-}
-
-.dato-grid--split .dato__v {
-  margin-top: 0;
-  min-width: 0;
 }
 
 .card__header {
@@ -908,6 +1158,34 @@ button {
 .card__header h2 {
   font-size: var(--fs-lg);
   color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card__header-icono {
+  flex-shrink: 0;
+  color: var(--color-text-soft);
+}
+
+/* Cuando el título dentro de .card__header es un .card__label (ver "Datos
+   del cliente" en ClienteDetalle.jsx, con Editar/Eliminar al lado) debe
+   verse IGUAL que cualquier otro .card__label suelto (ej. "Diagnóstico"),
+   no como un <h2> genérico — sin esto, la regla de arriba (selector de
+   tag, más específico que una sola clase) le pisaba el tamaño/mayúsculas. */
+.card__header .card__label {
+  font-size: var(--fs-base);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 800;
+  margin-bottom: 0;
+}
+
+.card__header-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* Tarjetas Cliente + Diagnóstico lado a lado en pantallas amplias */
@@ -938,8 +1216,14 @@ button {
   overflow-x: auto;
 }
 
+/* table-layout: fixed (no el "auto" default) — así los anchos del
+   <colgroup> en ClienteDetalle.jsx se respetan de verdad. Con "auto" cada
+   columna crece según su contenido más largo, así que "Nota" (texto
+   libre) terminaba empujando/invadiendo la columna de "Fecha" en vez de
+   quedarse en su propio ancho. */
 .visitas-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--fs-sm);
 }
@@ -950,6 +1234,12 @@ button {
   padding: 11px 10px;
   border-bottom: 1px solid var(--color-border);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.visitas-table__nota {
+  color: var(--color-text-soft);
 }
 
 .visitas-table th {
@@ -1183,7 +1473,7 @@ button {
    tanto el formulario al escribir). */
 .modal-overlay--arriba {
   align-items: flex-start;
-  padding: 20px var(--sp-4) var(--sp-4);
+  padding: 30px var(--sp-4) var(--sp-4);
 }
 
 .modal {
@@ -1219,12 +1509,12 @@ button {
   border-radius: var(--radius-lg);
 }
 
-/* Variante "arriba" (ver .modal-overlay--arriba): mismo criterio de las 4
-   esquinas redondeadas que "centered" (tampoco toca ningún borde de la
-   pantalla), pero más ancho — el modal de Nueva/Editar visita venía muy
-   apretado con varios campos por fila. */
+/* Variante "arriba" (ver .modal-overlay--arriba): más ancho que el resto
+   — el modal de Nueva/Editar visita venía muy apretado con varios campos
+   por fila — y de esquinas cuadradas a pedido (no redondeadas como el
+   resto de los modales). */
 .modal--arriba {
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   max-width: 620px;
 }
 
@@ -1232,6 +1522,12 @@ button {
   .modal--arriba {
     max-width: 780px;
   }
+}
+
+/* Bordes cuadrados a pedido (Nueva/Editar visita) — el cabezal oscuro
+   comparte esquinas con el modal, así que también hay que cuadrarlo acá. */
+.modal--arriba .modal__header--oscuro {
+  border-radius: 0;
 }
 
 @keyframes modal-in {
@@ -1271,27 +1567,29 @@ button {
   font-weight: 700;
 }
 
-/* Encabezado con ícono (headerIcon en Modal.jsx) — opcional, hoy solo lo
-   usa VisitaModal.jsx. Fondo invertido (igual criterio que los botones
-   primarios: oscuro en modo claro, claro en modo oscuro) para que
+/* Encabezado oscuro (headerIcon o headerOscuro en Modal.jsx) — opcional.
+   headerIcon lo usa VisitaModal.jsx (con el cuadrito de ícono, ver
+   .modal__header-icon abajo); headerOscuro lo usa VisitaDetalleModal.jsx
+   (mismo fondo, sin cuadrito). Fondo invertido (igual criterio que los
+   botones primarios: oscuro en modo claro, claro en modo oscuro) para que
    destaque como un "panel" propio dentro del modal. */
-.modal__header--icon {
+.modal__header--oscuro {
   background: var(--color-primary);
   color: var(--color-on-primary);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: 14px;
+  padding: 6px 14px 7px;
 }
 
-.modal__header--icon .modal__title {
+.modal__header--oscuro .modal__title {
   color: var(--color-on-primary);
 }
 
-.modal__header--icon .modal__close {
+.modal__header--oscuro .modal__close {
   color: var(--color-on-primary);
   opacity: 0.75;
 }
 
-.modal__header--icon .modal__close:hover {
+.modal__header--oscuro .modal__close:hover {
   background: rgba(255, 255, 255, 0.15);
   color: var(--color-on-primary);
   opacity: 1;
@@ -1322,10 +1620,29 @@ button {
   font-weight: 700;
 }
 
+/* Envuelve el botón de cerrar (✕) + closeExtra (opcional, ver Modal.jsx —
+   VisitaDetalleModal.jsx lo usa para la fecha) apilados en columna, pegado
+   a la derecha del header. */
+.modal__close-area {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.modal__close-extra {
+  font-size: var(--fs-2xs);
+  opacity: 0.8;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
 .modal__close {
   background: transparent;
   border: none;
-  font-size: var(--fs-2xl);
+  font-size: 1.9rem;
+  font-weight: 700;
   line-height: 1;
   color: var(--color-text-soft);
   padding: 4px 8px;
@@ -1342,8 +1659,23 @@ button {
   overflow-y: auto;
 }
 
+/* Un poco más de aire entre el cabezal oscuro y el contenido — con el
+   header oscuro (borde/franja de color bien marcada) el padding-top de
+   4px de arriba quedaba demasiado pegado. Solo afecta a los modales con
+   header oscuro (VisitaModal/VisitaDetalleModal), el resto no cambia. */
+.modal__header--oscuro + .modal__body {
+  padding-top: 14px;
+}
+
+/* Nueva/Editar visita pidió unos 5px más que el resto (headerOscuro
+   comparten esta regla con VisitaDetalleModal, que no cambia). */
+.modal--arriba .modal__header--oscuro + .modal__body {
+  padding-top: 19px;
+}
+
 .modal__footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
   padding: 12px 10px;
@@ -1353,11 +1685,10 @@ button {
 /* ---------- Formularios ---------- */
 .field {
   margin-bottom: 14px;
+  
 }
 
-.field:last-child {
-  margin-bottom: 0;
-}
+
 
 .field__label-row {
   margin-bottom: 6px;
@@ -1369,7 +1700,7 @@ button {
 .field__label-row--extra {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* justify-content: space-between; */
   gap: 8px;
 }
 
@@ -1393,12 +1724,6 @@ button {
    Mismo rojo que los errores (--color-danger) — antes eran dos rojos
    distintos sin relación entre sí para la misma idea semántica ("algo
    necesita tu atención"). */
-.field__required {
-  color: var(--color-danger);
-  font-weight: 700;
-  margin-left: 2px;
-}
-
 .field__hint {
   font-size: var(--fs-xs);
   color: var(--color-text-soft);
@@ -1480,7 +1805,7 @@ button {
    que no hacía falta) — ahora la fila nunca baja de línea, así que aplica
    siempre. */
 .formula-row .field:has(.autogrow--crece) {
-  flex: 1 1 240px;
+  flex: 1 1  240px;
   /* Nunca se achica de más: si el ancho disponible no alcanza ni para
      esto ni para los 3 campos angostos de al lado, la fila entera
      scrollea horizontal (ver overflow-x en .formula-row) en vez de
@@ -1510,7 +1835,7 @@ button {
    completo, no hace falta que nada de adentro se mida solo. */
 .formula-row .field:has(.input--corto) {
   flex: 0 0 auto;
-  width: 92px;
+  width: 83px;
 }
 
 /* width incluye el padding (box-sizing: border-box en toda la app) — 3ch
@@ -1552,8 +1877,8 @@ button {
 .select:focus,
 .textarea:focus {
   outline: none;
-  border-color: var(--color-rosa-fuerte);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
 }
 
 .textarea {
@@ -1573,17 +1898,18 @@ button {
   background: var(--color-input-bg);
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s;
+;
 }
 
 .input-con-prefijo__prefijo {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 7px;
   color: var(--color-text-soft);
   font-size: 16px;
   font-weight: 600;
   background: var(--color-primary-soft);
-  border-right: 1px solid var(--color-border);
+  /* border-right: 1px solid var(--color-border); */
   flex-shrink: 0;
 }
 
@@ -1611,18 +1937,18 @@ button {
 .input-con-prefijo__sufijo {
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 7px;
   color: var(--color-text-soft);
   font-size: 16px;
   font-weight: 600;
   background: var(--color-primary-soft);
-  border-left: 1px solid var(--color-border);
+  /*border-left: 1px solid var(--color-border);*/
   flex-shrink: 0;
 }
 
 .input-con-prefijo:focus-within {
-  border-color: var(--color-rosa-fuerte);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
 }
 
 .input-con-prefijo--error {
@@ -1661,29 +1987,6 @@ button {
   width: auto;
   min-width: 84px;
   max-width: 92px;
-}
-
-/* Mientras la lista nativa de cualquier <select> de la app está
-   desplegada, oscurece y difumina TODO lo demás en pantalla — la lista
-   nativa del navegador siempre se dibuja por encima de cualquier capa de
-   la página sin importar z-index, así que queda como lo único nítido.
-   "select-activo" la pone/saca el propio componente Select (Field.jsx) en
-   mousedown/teclas de apertura -> blur/change, con limpieza al desmontar
-   (ver los comentarios ahí para el detalle de cada bug que motivó esto, y
-   por qué NO se cierra también con "click" — se probó y empeoraba las
-   cosas).
-   Es una regla genérica sobre el componente compartido, así que aplica a
-   cualquier select existente y a los que se agreguen a futuro sin tocar
-   nada más acá. */
-body.select-activo::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: var(--overlay-dim);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  pointer-events: none;
 }
 
 .input--error,
@@ -1792,7 +2095,7 @@ body.select-activo::after {
 /* Grupo de opciones tipo segmented (Sí / No) */
 .segmented {
   display: inline-flex;
-  border: 1.5px solid var(--color-rosado-pastel);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--color-surface);
@@ -1923,6 +2226,7 @@ body.select-activo::after {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-left: 3px solid transparent;
+  
   /* Cuadrada a propósito (0, no var(--radius)) — contraste con los campos
      de adentro, que sí quedan redondeados como en el resto de la app. */
   border-radius: 0;
@@ -1932,9 +2236,11 @@ body.select-activo::after {
      puntas + Amonio, ya iban justas de espacio). */
   padding: var(--sp-4) 10px;
   margin-bottom: var(--sp-4);
-  /* Sombra leve, mismo tono que el fondo de los inputs (--color-input-bg)
-     — apenas se nota, solo separa la tarjeta del fondo del modal. */
-  box-shadow: 0 2px 6px rgba(248, 250, 252, 0.9);
+  /* Sombra leve que separa la tarjeta del fondo del modal — var(--shadow)
+     ya es distinta por tema (oscura y sutil en claro, negra en oscuro); un
+     rgba blanco fijo quedaba muy fuerte/raro en modo oscuro, sobre fondos
+     oscuros una sombra blanca no tiene sentido. */
+  box-shadow: var(--shadow);
 }
 
 .visita-seccion:last-child {
@@ -1971,6 +2277,7 @@ body.select-activo::after {
   flex-wrap: nowrap;
   align-items: flex-start;
   gap: 8px;
+ 
   /* Red de seguridad para pantallas muy angostas: Fórmula y los 3 campos
      angostos ya tienen anchos mínimos sensatos (ver más arriba) y no se
      achican más allá de eso — si aun así no entran todos, la fila
@@ -2059,7 +2366,7 @@ body.select-activo::after {
   font-size: var(--fs-sm);
   font-weight: 600;
   padding: 8px 14px;
-  border: 1.5px solid var(--color-rosado-pastel);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
@@ -2076,8 +2383,18 @@ body.select-activo::after {
    no mostraría ningún indicador visual de foco. */
 .foto-input:focus + .foto-boton {
   outline: none;
-  border-color: var(--color-rosa-fuerte);
-  box-shadow: 0 0 0 3px rgba(255, 143, 201, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
+}
+
+/* Campo de foto (Nueva/Editar visita) centrado horizontalmente — a
+   diferencia del resto de los campos (etiqueta + control alineados a la
+   izquierda). */
+.field:has(.foto-input) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .foto-boton__texto--desktop {

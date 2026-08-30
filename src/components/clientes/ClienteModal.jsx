@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { User, Phone, Cake } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -182,7 +183,12 @@ export default function ClienteModal() {
           <Button variant="ghost" onClick={cerrarConGuardia} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleGuardar} disabled={saving || loading}>
+          <Button
+            variant="primary"
+            className="btn--sin-borde-rosa"
+            onClick={handleGuardar}
+            disabled={saving || loading}
+          >
             {saving ? 'Guardando…' : 'Guardar'}
           </Button>
         </>
@@ -206,11 +212,10 @@ export default function ClienteModal() {
             </div>
           )}
 
-          {/* Sección 1: datos del cliente */}
+          {/* Sección 1: datos del cliente (sin título — a pedido) */}
           <div className="card">
-            <h3 className="form-section-label">Datos del cliente</h3>
-
             <Field
+              icon={<User size={14} strokeWidth={2.25} />}
               label="Nombre completo"
               required
               error={errors.nombreCompleto}
@@ -225,7 +230,13 @@ export default function ClienteModal() {
             </Field>
 
             <div className="form-row">
-              <Field label="Teléfono" required htmlFor="f-tel" error={errors.telefono}>
+              <Field
+                icon={<Phone size={14} strokeWidth={2.25} />}
+                label="Teléfono"
+                required
+                htmlFor="f-tel"
+                error={errors.telefono}
+              >
                 <TextInput
                   id="f-tel"
                   type="tel"
@@ -235,7 +246,10 @@ export default function ClienteModal() {
                 />
               </Field>
 
-              <Field label="Cumpleaños (día y mes)">
+              <Field
+                icon={<Cake size={14} strokeWidth={2.25} color="var(--color-amarillo-brillante)" />}
+                label="Cumpleaños (día y mes)"
+              >
                 {/* Sin año a propósito — no se pregunta el año de
                     nacimiento, solo día y mes (lo único que necesita el
                     aviso de cumpleaños). */}

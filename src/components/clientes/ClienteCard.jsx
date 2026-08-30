@@ -1,9 +1,10 @@
-import { Phone, Cake, MessageCircle } from 'lucide-react'
+import { Cake, MessageCircle, History } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import { useApp } from '../../context/AppContext'
 import { buildWhatsappLink } from '../../utils/whatsapp'
 import { esCumpleanosHoy } from '../../utils/date'
+import { fmtFecha } from '../../utils/format'
 
 // Card de cliente en el Home.
 // - Clic en el cuerpo -> onOpen (navega al detalle, donde viven Editar/Eliminar)
@@ -12,6 +13,11 @@ export default function ClienteCard({ cliente, onOpen }) {
   const { prefetchClienteDetalle } = useApp()
   const waLink = buildWhatsappLink(cliente.telefono)
   const esCumple = esCumpleanosHoy(cliente.fechaCumpleanos)
+  // cantidadVisitas/ultimaVisitaFecha: agregados recalculados en el
+  // backend cada vez que se crea/edita/borra una visita (ver
+  // recalcularAgregadosDeCliente_ en Code.gs) — no hay que leer el
+  // historial completo acá.
+  const cantidadVisitas = Number(cliente.cantidadVisitas) || 0
 
   const handleWhatsapp = (e) => {
     e.stopPropagation()
@@ -45,12 +51,20 @@ export default function ClienteCard({ cliente, onOpen }) {
       aria-label={`Abrir ficha de ${cliente.nombreCompleto}`}
       onKeyDown={handleKeyDown}
     >
-      <div className="cliente-card__nombre">{cliente.nombreCompleto}</div>
+      <div className="cliente-card__nombre-fila">
+        <span className="cliente-card__nombre">{cliente.nombreCompleto}</span>
+        <span
+          className="cliente-card__contador"
+          title={`${cantidadVisitas} ${cantidadVisitas === 1 ? 'visita' : 'visitas'}`}
+        >
+          <History size={11} strokeWidth={2.5} />
+          {cantidadVisitas}
+        </span>
+      </div>
 
       <div className="cliente-card__acciones">
-        <div className="cliente-card__tel">
-          <Phone size={13} strokeWidth={2.25} />
-          <span>{cliente.telefono || 'Sin teléfono'}</span>
+        <div className="cliente-card__fecha">
+          <span>{cliente.ultimaVisitaFecha ? fmtFecha(cliente.ultimaVisitaFecha) : 'Sin visitas'}</span>
         </div>
         {esCumple && (
           <span className="cumple-badge" title="¡Hoy es su cumpleaños! 🎉">

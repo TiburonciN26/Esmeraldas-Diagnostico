@@ -17,16 +17,34 @@ const EXIT_MS = 180
 //   el padre lo desmonte de golpe apenas cambia su estado — por eso los
 //   componentes que lo usan pasan open={open} y SIEMPRE renderizan
 //   <Modal>, sin envolverlo en "{open && <Modal>...}".
-// - headerIcon/subtitle son opcionales — sin ellos el header se ve
-//   exactamente igual que siempre (solo título + botón cerrar), así que
-//   no afectan a ningún otro modal de la app que no los pase (por ahora
-//   solo VisitaModal.jsx los usa, para el encabezado con ícono).
+// - headerIcon/subtitle/headerOscuro son opcionales — sin ellos el header
+//   se ve exactamente igual que siempre (solo título + botón cerrar), así
+//   que no afectan a ningún otro modal de la app que no los pase.
+//   headerIcon (ícono + fondo oscuro) lo usa VisitaModal.jsx; headerOscuro
+//   (mismo fondo oscuro, sin el cuadrito de ícono) lo usa
+//   VisitaDetalleModal.jsx — cualquiera de los dos alcanza para pintar el
+//   header oscuro.
 // - arriba (opcional, alternativa a "centered"): en vez de centrarlo
 //   verticalmente, lo pega cerca del borde superior y lo ensancha — hoy
-//   solo VisitaModal.jsx lo usa (formulario largo con muchos campos, deja
-//   espacio abajo para que el teclado del celular no tape el formulario al
-//   escribir). Ningún otro modal lo pasa, así que no cambia para ellos.
-export default function Modal({ open, title, subtitle, headerIcon, onClose, children, footer, centered, arriba }) {
+//   lo usan VisitaModal.jsx y VisitaDetalleModal.jsx (mismo ancho para que
+//   los dos modales de visita se vean del mismo tamaño). Ningún otro modal
+//   lo pasa, así que no cambia para ellos.
+// - closeExtra (opcional): contenido chico debajo del botón de cerrar (✕)
+//   — hoy VisitaDetalleModal.jsx lo usa para la fecha de la visita, pegada
+//   al cierre en vez de compartir línea con "Cliente" en el subtítulo.
+export default function Modal({
+  open,
+  title,
+  subtitle,
+  headerIcon,
+  headerOscuro,
+  closeExtra,
+  onClose,
+  children,
+  footer,
+  centered,
+  arriba,
+}) {
   const [rendered, setRendered] = useState(open)
   const [closing, setClosing] = useState(false)
   const modalRef = useRef(null)
@@ -125,7 +143,7 @@ export default function Modal({ open, title, subtitle, headerIcon, onClose, chil
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className={`modal__header ${headerIcon ? 'modal__header--icon' : ''}`}>
+        <div className={`modal__header ${headerIcon || headerOscuro ? 'modal__header--oscuro' : ''}`}>
           {headerIcon && <div className="modal__header-icon">{headerIcon}</div>}
           <div className="modal__header-text">
             <h2 className="modal__title" id={titleId}>
@@ -133,9 +151,12 @@ export default function Modal({ open, title, subtitle, headerIcon, onClose, chil
             </h2>
             {subtitle && <div className="modal__subtitle">{subtitle}</div>}
           </div>
-          <button className="modal__close" onClick={onClose} aria-label="Cerrar">
-            ×
-          </button>
+          <div className="modal__close-area">
+            <button className="modal__close" onClick={onClose} aria-label="Cerrar">
+              ×
+            </button>
+            {closeExtra && <div className="modal__close-extra">{closeExtra}</div>}
+          </div>
         </div>
 
         <div className="modal__body">{children}</div>

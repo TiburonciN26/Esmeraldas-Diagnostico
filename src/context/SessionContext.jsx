@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { login as apiLogin, setOnSesionInvalida } from '../services/api'
 import { getSession, setSession, clearSession } from '../services/session'
+import { actualizarFotoUsuario as apiActualizarFotoUsuario } from '../services/usuarioService'
 
 // Sesión del usuario logueado (correo, código, rol, nombre). Se persiste en
 // localStorage para no pedir login en cada visita.
@@ -16,7 +17,7 @@ export function SessionProvider({ children }) {
 
   const login = useCallback(async (correo, codigo) => {
     const usuario = await apiLogin(correo, codigo)
-    const nueva = { correo: usuario.correo, codigo, rol: usuario.rol, nombre: usuario.nombre }
+    const nueva = { correo: usuario.correo, codigo, rol: usuario.rol, nombre: usuario.nombre, foto: usuario.foto || '' }
     setSession(nueva)
     setSessionState(nueva)
     setMotivoSalida(null)
@@ -25,6 +26,21 @@ export function SessionProvider({ children }) {
   const logout = useCallback(() => {
     clearSession()
     setSessionState(null)
+  }, [])
+
+  // Sube la foto de perfil al backend (columna "foto" en la pestaña
+  // "usuario" — ver actualizarFotoUsuario_ en Code.gs) y la actualiza en la
+  // sesión guardada, así queda disponible en cualquier navegador/dispositivo
+  // donde se loguee esta cuenta (antes vivía solo en localStorage de ESE
+  // navegador, por eso no se veía al entrar desde otro lado con ngrok).
+  const actualizarFoto = useCallback(async (foto) => {
+    await apiActualizarFotoUsuario(foto)
+    setSessionState((actual) => {
+      if (!actual) return actual
+      const nueva = { ...actual, foto }
+      setSession(nueva)
+      return nueva
+    })
   }, [])
 
   // Si una acción autenticada descubre que la contraseña guardada ya no es
@@ -42,7 +58,7 @@ export function SessionProvider({ children }) {
   }, [])
 
   return (
-    <SessionContext.Provider value={{ session, login, logout, motivoSalida }}>
+    <SessionContext.Provider value={{ session, login, logout, motivoSalida, actualizarFoto }}>
       {children}
     </SessionContext.Provider>
   )

@@ -1,10 +1,13 @@
 // Componentes de formulario reutilizables (se usan aquí y en el modal de visita).
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 // Envoltura etiqueta + control + error/hint.
-// required agrega un asterisco (convención visual para todos los formularios
-// de la app: todo campo obligatorio debe marcarse así en su label).
+// required no pinta nada en el label (se sacó el asterisco a pedido: "estorbaba"
+// en la interfaz) — el campo sigue siendo obligatorio igual, la validación de
+// cada modal no depende de esto en absoluto. Se deja el prop porque los
+// componentes que llaman a Field siguen pasándolo (documenta intención en el
+// código de cada modal) aunque ya no tenga efecto visual.
 // labelExtra pinta algo (ej. un toggle de íconos) al otro extremo de la
 // fila de la etiqueta, sin tocar el resto del campo — ver "Tipo de
 // aplicación" en VisitaModal.jsx.
@@ -23,12 +26,6 @@ export function Field({ label, error, hint, children, htmlFor, required, labelEx
               </span>
             )}
             {label}
-            {required && (
-              <span className="field__required" aria-hidden="true">
-                {' '}
-                *
-              </span>
-            )}
           </label>
           {labelExtra}
         </div>
@@ -128,107 +125,20 @@ export function TextArea({ className = '', ...props }) {
 
 // Select con opciones. options: array de strings o {value,label}.
 //
-// Mientras la lista nativa está desplegada, agrega "select-activo" a <body>
-// (ver index.css: oscurece y difumina el fondo para que la lista resalte).
-// No usa "focus" para abrir el difuminado (versión anterior) porque el foco
-// se queda en el <select> aunque la lista esté cerrada — un Tab hasta el
-// campo, o pasar a otra opción con las flechas (que en la mayoría de los
-// navegadores de escritorio cambia el valor SIN desplegar nada), prendía el
-// difuminado sin que hubiera ninguna lista visible.
-//
-// Abre con "mousedown" (clic/touch, dispara siempre, antes de que el
-// navegador muestre la lista) y con las teclas que realmente despliegan un
-// <select> nativo (Enter/Espacio, F4, Alt+Flecha — las flechas SOLAS no
-// entran a propósito, ver arriba).
-//
-// Cierra con "change" (cambió el valor) y "blur" (se fue el foco).
-//
-// Se probó también cerrar con "click", pensando que un <select> lo dispara
-// recién cuando la lista nativa termina de cerrarse (cubriría el caso de
-// reelegir la MISMA opción, que con "change" solo no dispara nada y deja el
-// difuminado pegado hasta que el foco se vaya por otro lado) — pero un
-// vistazo real (captura de pantalla en PC) mostró que estaba mal: "click"
-// se dispara junto con el "mousedown" que ABRE la lista, no cuando se
-// cierra (el mismo down+up que abre el desplegable ya cuenta como un click
-// normal sobre el <select>, sin importar qué lista nativa se despliegue
-// después). Con "click" agregado, el difuminado se apagaba antes de
-// llegar a pintarse — quedaba invisible SIEMPRE, un problema mucho peor que
-// el caso puntual que se quería tapar. Revertido: no hay forma 100%
-// confiable de detectar "la lista nativa se cerró" desde JS (ningún
-// navegador expone ese evento), así que reelegir la misma opción sigue
-// siendo un caso conocido sin resolver, mitigado por blur/change y por la
-// limpieza al desmontar de más abajo (que sí cubre el caso más grave).
-//
-// abiertoRef + el efecto de limpieza al desmontar arreglan el bug más serio:
-// si el <select> desaparece del DOM con la lista "abierta" según nuestro
-// propio registro (p.ej. Escape cierra el modal entero y no solo la lista),
-// nunca llega a disparar blur -> sin este cleanup, el difuminado quedaba
-// pegado en <body> para siempre, cubriendo TODA la app, sin ningún modal ni
-// lista realmente abiertos, sin forma de recuperarse salvo recargar.
-function esTeclaDeApertura(e) {
-  if (e.key === 'Enter' || e.key === ' ') return true
-  if (e.key === 'F4') return true
-  if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return true
-  return false
-}
-
-export function Select({
-  options = [],
-  placeholder,
-  error,
-  id,
-  className = '',
-  onFocus,
-  onBlur,
-  onChange,
-  onMouseDown,
-  onKeyDown,
-  ...props
-}) {
-  // Ref (no state): solo lo leen los handlers de esta misma instancia, no
-  // hace falta re-render. Guarda si ESTE select fue quien prendió el
-  // difuminado, para que su cleanup al desmontarse no le apague el
-  // difuminado a otro select que lo tenga activo por su cuenta.
-  const abiertoRef = useRef(false)
-
-  const abrir = () => {
-    abiertoRef.current = true
-    document.body.classList.add('select-activo')
-  }
-  const cerrar = () => {
-    abiertoRef.current = false
-    document.body.classList.remove('select-activo')
-  }
-
-  useEffect(() => {
-    return () => {
-      if (abiertoRef.current) document.body.classList.remove('select-activo')
-    }
-  }, [])
-
+// Antes difuminaba el fondo (clase "select-activo" en <body>) mientras la
+// lista nativa estaba desplegada. Se sacó: cerrar la lista con Escape o con
+// un clic afuera no siempre disparaba "blur"/"change" de forma confiable
+// (dependía del navegador), así que el difuminado a veces quedaba pegado en
+// pantalla después de que la lista ya se había cerrado. Más simple no
+// tener el efecto que perseguir cada caso borde de cuándo se cierra un
+// <select> nativo, algo que ningún navegador expone de forma confiable.
+export function Select({ options = [], placeholder, error, id, className = '', ...props }) {
   return (
     <select
       id={id}
       className={`select ${error ? 'select--error' : ''} ${className}`}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={error && id ? `${id}-error` : undefined}
-      onMouseDown={(e) => {
-        abrir()
-        onMouseDown?.(e)
-      }}
-      onKeyDown={(e) => {
-        if (esTeclaDeApertura(e)) abrir()
-        onKeyDown?.(e)
-      }}
-      onFocus={onFocus}
-      onBlur={(e) => {
-        cerrar()
-        onBlur?.(e)
-      }}
-      onChange={(e) => {
-        cerrar()
-        onChange?.(e)
-      }}
       {...props}
     >
       {placeholder != null && <option value="">{placeholder}</option>}

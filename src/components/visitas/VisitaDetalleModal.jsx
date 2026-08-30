@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Pencil } from 'lucide-react'
+import { Trash2, Pencil, RefreshCw } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useConfirm, useAlert } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -8,13 +8,13 @@ import { calcularVisibilidad } from '../../utils/visitaLogic'
 import { fmtPrecio, fmtFecha } from '../../utils/format'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
-import { Dato } from '../ui/Card'
 
 // Vista de solo lectura con TODOS los campos de una visita.
 // Se abre al hacer clic en el cuerpo de una fila de la tabla de visitas, que
 // ya trae el objeto completo (nada que pedirle al backend acá).
 export default function VisitaDetalleModal() {
-  const { visitaView, closeVerVisita, openEditarVisita, aplicarVisitaEliminada } = useApp()
+  const { visitaView, closeVerVisita, openEditarVisita, openNuevaVisita, aplicarVisitaEliminada, clienteDetalle } =
+    useApp()
   const { open, visita } = visitaView
   const confirmar = useConfirm()
   const alertar = useAlert()
@@ -40,6 +40,14 @@ export default function VisitaDetalleModal() {
     if (open) setDeleting(false)
   }, [open])
 
+  // Mismo criterio que VisitaModal.jsx para el nombre del cliente en el
+  // header: solo se muestra si el cliente actualmente abierto en Detalle
+  // de cliente coincide con el de esta visita.
+  const nombreCliente =
+    visitaMostrada && clienteDetalle.cliente?.id === visitaMostrada.clienteId
+      ? clienteDetalle.cliente.nombreCompleto
+      : null
+
   // Visibilidad de campos condicionales (misma lógica que el formulario).
   const vis = visitaMostrada ? calcularVisibilidad(visitaMostrada) : null
   const mostrarDecoloracion = vis?.decoloracion
@@ -63,11 +71,22 @@ export default function VisitaDetalleModal() {
   const mostrarMediosAparte = tieneFormulaMedios && !soloMedios && !formulasIguales
 
   // "Sí"/"No" legible a partir del valor guardado ('si'/'no'/'').
-  const etiquetaAmonio = (valor) => (valor === 'si' ? 'Sí' : valor === 'no' ? 'No' : '')
+  const etiquetaAmonio = (valor) => (valor === 'si' ? 'Sí' : valor === 'no' ? 'No' : '—')
 
   const handleEditar = () => {
     closeVerVisita()
     openEditarVisita(visitaMostrada)
+  }
+
+  // Abre Nueva visita precargada con los datos de ESTA visita (no
+  // necesariamente la última del cliente) — mismo mecanismo que la
+  // precarga automática de "alta con historial" (ver CAMPOS_PRECARGA en
+  // VisitaModal.jsx), solo que la fuente es la visita que se está viendo
+  // acá en vez de la más reciente. Al ser alta (visitaId null), la fecha
+  // arranca en hoy y se guarda como una visita nueva, no pisa esta.
+  const handleReutilizarFormula = () => {
+    closeVerVisita()
+    openNuevaVisita(visitaMostrada.clienteId, visitaMostrada)
   }
 
   const handleEliminar = async () => {
@@ -92,11 +111,55 @@ export default function VisitaDetalleModal() {
     }
   }
 
+  // Bloque de una fórmula (raíz o medios a puntas) — 3 filas: nombre +
+  // amonio arriba, y debajo una mini tabla de label/valor (mismo patrón
+  // que .detalle-visita__grid de las otras secciones) para mezcla,
+  // oxígeno, onzas y tiempo.
+  const tarjetaFormula = (nombre, formula, oxidante, onzas, tiempo, amonio) => (
+    <div className="detalle-visita__formula-card">
+      <div className="detalle-visita__formula-header">
+        <span className="detalle-visita__formula-nombre">{nombre}</span>
+        <span className="detalle-visita__amonio">
+          Amonio: <strong>{etiquetaAmonio(amonio)}</strong>
+        </span>
+      </div>
+      <div className="detalle-visita__grid detalle-visita__grid--formula">
+        <div className="detalle-visita__dato">
+          <span className="detalle-visita__label">Mezcla</span>
+          <span className="detalle-visita__valor">{formula || '—'}</span>
+        </div>
+        <div className="detalle-visita__dato">
+          <span className="detalle-visita__label">Oxígenta</span>
+          <span className="detalle-visita__valor">{oxidante || '—'}</span>
+        </div>
+        {onzas && (
+          <div className="detalle-visita__dato">
+            <span className="detalle-visita__label">Onzas</span>
+            <span className="detalle-visita__valor">{onzas}</span>
+          </div>
+        )}
+        <div className="detalle-visita__dato">
+          <span className="detalle-visita__label">Tiempo</span>
+          <span className="detalle-visita__valor">{tiempo || '—'}</span>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <Modal
       open={open}
       centered
+      headerOscuro
       title="Detalle de la visita"
+      subtitle={
+        nombreCliente ? (
+          <>
+            Cliente: <strong>{nombreCliente}</strong>
+          </>
+        ) : undefined
+      }
+      closeExtra={visitaMostrada ? fmtFecha(visitaMostrada.fecha) : undefined}
       onClose={closeVerVisita}
       footer={
         <>
@@ -117,10 +180,21 @@ export default function VisitaDetalleModal() {
             Cerrar
           </Button>
           {visitaMostrada && (
-            <Button variant="primary" onClick={handleEditar} disabled={deleting}>
-              <Pencil size={14} strokeWidth={2.25} />
-              Editar
-            </Button>
+            <>
+              <Button variant="ghost" onClick={handleReutilizarFormula} disabled={deleting}>
+                <RefreshCw size={14} strokeWidth={2.25} />
+                Reutilizar fórmula
+              </Button>
+              <Button
+                variant="primary"
+                className="btn--sin-borde-rosa"
+                onClick={handleEditar}
+                disabled={deleting}
+              >
+                <Pencil size={14} strokeWidth={2.25} />
+                Editar
+              </Button>
+            </>
           )}
         </>
       }
@@ -129,91 +203,99 @@ export default function VisitaDetalleModal() {
         <p className="muted">No se encontró la visita.</p>
       ) : (
         <>
-          {/* Aplicación */}
+          {/* Parámetros del servicio (sin título — a pedido) */}
           <div className="detalle-section">
-            <h3 className="form-section-label">Aplicación</h3>
-            <div className="dato-grid dato-grid--split">
-              <Dato label="Tipo de aplicación">{visitaMostrada.tipoAplicacion}</Dato>
-              <Dato label="% de canas">
-                {visitaMostrada.porcentajeCanas ? `${visitaMostrada.porcentajeCanas}%` : ''}
-              </Dato>
+            <div className="detalle-visita__grid">
+              <div className="detalle-visita__dato">
+                <span className="detalle-visita__label">Tipo de aplicación</span>
+                <span className="detalle-visita__valor">{visitaMostrada.tipoAplicacion || '—'}</span>
+              </div>
+              <div className="detalle-visita__dato">
+                <span className="detalle-visita__label">% de canas</span>
+                <span className="detalle-visita__valor">
+                  {visitaMostrada.porcentajeCanas ? `${visitaMostrada.porcentajeCanas}%` : '—'}
+                </span>
+              </div>
+              <div className="detalle-visita__dato">
+                <span className="detalle-visita__label">Largo del cabello</span>
+                <span className="detalle-visita__valor">{visitaMostrada.largoCabello || '—'}</span>
+              </div>
               {mostrarDecoloracion && (
-                <Dato label="Decoloración — etapa">{visitaMostrada.decoloracionEtapa}</Dato>
+                <div className="detalle-visita__dato">
+                  <span className="detalle-visita__label">Decoloración — etapa</span>
+                  <span className="detalle-visita__valor">{visitaMostrada.decoloracionEtapa || '—'}</span>
+                </div>
               )}
             </div>
           </div>
 
           {/* Fórmula principal: medios a puntas si es la única cargada,
               raíz en cualquier otro caso (su label cambia a "raíz y
-              puntas" cuando ambas coinciden) — fórmula + oxígeno +
-              tiempo, los 3 en una fila */}
+              puntas" cuando ambas coinciden) — cada fórmula es su propia
+              tarjeta (ver .detalle-visita__formula-card en index.css). */}
           <div className="detalle-section">
-            <div className="dato-grid--trio">
-              {soloMedios ? (
-                <>
-                  <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
-                  <Dato label="Oxig. Vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
-                  <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
-                  <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
-                    {etiquetaAmonio(visitaMostrada.amonioMediosAPuntas)}
-                  </Dato>
-                </>
-              ) : (
-                <>
-                  <Dato label={formulasIguales ? 'Fórmula (raíz y puntas)' : 'Fórmula raíz'}>
-                    {visitaMostrada.formulaRaiz}
-                  </Dato>
-                  <Dato label="Oxig. Vol">{visitaMostrada.oxidanteRaiz}</Dato>
-                  <Dato label="Tiempo">{visitaMostrada.tiempoRaiz}</Dato>
-                  <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
-                    {etiquetaAmonio(visitaMostrada.amonioRaiz)}
-                  </Dato>
-                </>
-              )}
-            </div>
-          </div>
+            {soloMedios
+              ? tarjetaFormula(
+                  'Fórmula medios a puntas',
+                  visitaMostrada.formulaMediosAPuntas,
+                  visitaMostrada.oxidanteMediosAPuntas,
+                  visitaMostrada.onzasMediosAPuntas,
+                  visitaMostrada.tiempoMediosAPuntas,
+                  visitaMostrada.amonioMediosAPuntas
+                )
+              : tarjetaFormula(
+                  formulasIguales ? 'Fórmula (raíz y puntas)' : 'Fórmula raíz',
+                  visitaMostrada.formulaRaiz,
+                  visitaMostrada.oxidanteRaiz,
+                  visitaMostrada.onzasRaiz,
+                  visitaMostrada.tiempoRaiz,
+                  visitaMostrada.amonioRaiz
+                )}
 
-          {/* Fórmula medios a puntas como bloque APARTE — solo cuando de
-              verdad es distinta de la de raíz (no para "Retoque de raíz",
-              "Medio a punta", "Baño de color", ni fórmulas únicas). */}
-          {mostrarMediosAparte && (
-            <div className="detalle-section">
-              <div className="dato-grid--trio">
-                <Dato label="Fórmula medios a puntas">{visitaMostrada.formulaMediosAPuntas}</Dato>
-                <Dato label="Oxig. vol">{visitaMostrada.oxidanteMediosAPuntas}</Dato>
-                <Dato label="Tiempo">{visitaMostrada.tiempoMediosAPuntas}</Dato>
-                <Dato label="Amonio" style={{ gridColumn: '1 / -1' }}>
-                  {etiquetaAmonio(visitaMostrada.amonioMediosAPuntas)}
-                </Dato>
-              </div>
-            </div>
-          )}
+            {/* Fórmula medios a puntas como bloque APARTE — solo cuando de
+                verdad es distinta de la de raíz (no para "Retoque de raíz",
+                "Medio a punta", "Baño de color", ni fórmulas únicas). */}
+            {mostrarMediosAparte &&
+              tarjetaFormula(
+                'Fórmula medios a puntas',
+                visitaMostrada.formulaMediosAPuntas,
+                visitaMostrada.oxidanteMediosAPuntas,
+                visitaMostrada.onzasMediosAPuntas,
+                visitaMostrada.tiempoMediosAPuntas,
+                visitaMostrada.amonioMediosAPuntas
+              )}
+          </div>
 
           {/* Resultado y datos */}
           <div className="detalle-section">
-            <h3 className="form-section-label">Resultado y datos</h3>
-            <div className="dato-grid dato-grid--split">
-              <Dato label="Precio">{fmtPrecio(visitaMostrada.precio)}</Dato>
-              <Dato label="Color obtenido">{visitaMostrada.colorObtenido}</Dato>
-              <Dato label="Largo del cabello">{visitaMostrada.largoCabello}</Dato>
-              <Dato label="Fecha">{fmtFecha(visitaMostrada.fecha)}</Dato>
+            <h3 className="detalle-visita__titulo">Resultado obtenido</h3>
+            <div className="detalle-visita__grid">
+              <div className="detalle-visita__dato">
+                <span className="detalle-visita__label">Color obtenido</span>
+                <span className="detalle-visita__valor">{visitaMostrada.colorObtenido || '—'}</span>
+              </div>
+              <div className="detalle-visita__dato">
+                <span className="detalle-visita__label">Precio</span>
+                <span className="detalle-visita__valor">{fmtPrecio(visitaMostrada.precio)}</span>
+              </div>
             </div>
-            <div style={{ marginTop: 12 }}>
-              <Dato label="Nota">{visitaMostrada.nota}</Dato>
+            <div style={{ marginTop: 14 }}>
+              <span className="detalle-visita__label">Nota</span>
+              <div className="detalle-visita__nota-caja">
+                {visitaMostrada.nota || <span className="muted">—</span>}
+              </div>
             </div>
           </div>
 
-          {/* Foto del resultado */}
-          <div className="detalle-section">
-            <h3 className="form-section-label">Foto del resultado</h3>
-            {visitaMostrada.fotoResultado ? (
+          {/* Foto del resultado — sin título ni texto de placeholder (a
+              pedido): si no hay foto, no se muestra nada. */}
+          {visitaMostrada.fotoResultado && (
+            <div className="detalle-section">
               <div className="foto-preview">
                 <img className="foto-preview__img" src={visitaMostrada.fotoResultado} alt="Resultado" />
               </div>
-            ) : (
-              <p className="muted">Sin foto cargada.</p>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </Modal>
