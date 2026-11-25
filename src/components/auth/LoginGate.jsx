@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { useSession } from '../../context/SessionContext'
 import Button from '../ui/Button'
 import { Field, TextInput } from '../ui/Field'
@@ -46,17 +46,25 @@ export default function LoginGate({ children }) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
-        <div className="login-card__logo">
-          <img src={logoUrl} alt="Esmeraldas Salón & Spa" />
+        <div className="login-card__cabecera">
+          <div className="login-card__logo">
+            <img src={logoUrl} alt="Esmeraldas Salón & Spa" />
+          </div>
+          <span className="login-card__kicker">Cuaderno de clientes · uso interno</span>
         </div>
-        <p className="muted login-card__sub">Ingresá con tu correo y contraseña.</p>
+
+        <div>
+          <h1 className="login-card__titulo">Ingresar</h1>
+          <p className="login-card__sub">Ingresá con tu correo y contraseña.</p>
+        </div>
 
         {(error || motivoSalida) && (
-          <div className="form-error" role="alert">
+          <div className="form-error" role="alert" style={{ margin: 0 }}>
             {error || motivoSalida}
           </div>
         )}
 
+        <div className="login-card__campos">
         <Field label="Correo" required htmlFor="login-correo">
           <TextInput
             id="login-correo"
@@ -93,10 +101,14 @@ export default function LoginGate({ children }) {
             </button>
           </div>
         </Field>
+        </div>
 
         <Button type="submit" variant="primary" disabled={loading} className="login-card__btn">
           {loading ? 'Ingresando…' : 'Entrar'}
+          {!loading && <ArrowRight size={18} strokeWidth={2.5} aria-hidden="true" />}
         </Button>
+
+        <p className="login-card__pie">Esmeraldas Salón &amp; Spa · Acceso solo para el equipo del salón</p>
       </form>
     </div>
   )

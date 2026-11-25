@@ -17,8 +17,8 @@ export default defineConfig({
         start_url: '.',
         scope: '.',
         display: 'standalone',
-        theme_color: '#e0518f',
-        background_color: '#fafafa',
+        theme_color: '#ecebe6',
+        background_color: '#ecebe6',
         icons: [
           { src: 'icons/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icons/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -32,6 +32,26 @@ export default defineConfig({
         // Workbox no los toca: siempre se piden a la red, nunca quedan
         // desactualizados en caché.
         globPatterns: ['**/*.{js,css,html,png,ico,svg}'],
+        // Tipografía Archivo (Google Fonts): se guarda en caché al primer uso
+        // para que las siguientes aperturas no esperen a la red y la app
+        // instalada se vea igual sin conexión. Solo estos dos orígenes de
+        // fuentes; el resto de las requests (datos) no se toca.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'google-fonts-css' },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-files',
+              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

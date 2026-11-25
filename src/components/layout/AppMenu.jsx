@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Menu, Users, LogOut, Sun, Moon, CircleUserRound } from 'lucide-react'
+import { Menu, X, Users, LogOut, Sun, Moon, CircleUserRound } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useSession } from '../../context/SessionContext'
 import { useConfirm } from '../../context/ConfirmContext'
@@ -90,12 +90,12 @@ export default function AppMenu() {
       <button
         type="button"
         className="app-menu__trigger"
-        aria-label="Abrir menú"
+        aria-label={open ? 'Cerrar menú' : 'Abrir menú'}
         aria-haspopup="true"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <Menu size={20} strokeWidth={2.25} />
+        {open ? <X size={20} strokeWidth={2.25} /> : <Menu size={20} strokeWidth={2.25} />}
       </button>
 
       {open && (

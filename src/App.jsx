@@ -12,14 +12,23 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* Único cabezal de la app: fijo, no cambia al entrar/salir del
-          detalle de un cliente (antes cada pantalla traía el suyo propio,
-          y el menú/logo desaparecían y volvían a aparecer de golpe al
-          navegar — quedaba confuso). ClienteDetalle.jsx ya no trae ningún
-          cabezal propio; "volver" vive ahí como botón flotante. */}
-      <TopBar title="Clientes" bigTitle showLogo menu />
+      {/* La "hoja" del cuaderno sobre el escritorio (ver .hoja en
+          index.css). Único cabezal de la app: fijo, no cambia al entrar/
+          salir de la ficha de un cliente. "Volver" vive en la ficha. */}
+      <div className="hoja">
+        <TopBar
+          title={
+            <>
+              Registro de
+              <br />
+              clientes
+            </>
+          }
+          menu
+        />
 
-      {view === VIEWS.DETALLE ? <ClienteDetalle /> : <Home />}
+        {view === VIEWS.DETALLE ? <ClienteDetalle /> : <Home />}
+      </div>
 
       {/* Modales globales: se controlan por estado en el contexto */}
       <ClienteModal />

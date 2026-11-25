@@ -46,6 +46,8 @@ export function ConfirmProvider({ children }) {
       {children}
       <Modal
         open={Boolean(dialog)}
+        ancho="sm"
+        centered
         title={dialogMostrado?.title || (dialogMostrado?.tipo === 'alert' ? 'Aviso' : 'Confirmar')}
         onClose={() => cerrar(dialogMostrado?.tipo === 'alert' ? undefined : false)}
         footer={

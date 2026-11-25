@@ -1,27 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, X, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Search, X, ArrowUp, ArrowDown, Plus } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { normalizarTexto } from '../utils/format'
 import { TIPOS_APLICACION } from '../data/constants'
 import ClienteCard from '../components/clientes/ClienteCard'
 import Button from '../components/ui/Button'
 
-// Criterios de orden de la lista de clientes (ver el botón "ordenar",
-// separado del filtro por tipo: uno RECORTA qué se ve, el otro reordena lo
-// que ya se ve — mezclarlos en un solo control confundiría). dirDefault es
-// la dirección con la que arranca cada criterio la primera vez que se
-// elige; volver a tocar el mismo criterio invierte la dirección en vez de
-// tener que elegir "ascendente/descendente" aparte.
+// Criterios de orden de la lista de clientes. dirDefault es la dirección
+// con la que arranca cada criterio al elegirlo; el botón de flecha al lado
+// del selector invierte la dirección.
 const OPCIONES_ORDEN = [
-  { criterio: 'nombre', label: 'Nombre', dirDefault: 'asc' },
+  { criterio: 'nombre', label: 'Nombre (A–Z)', labelDesc: 'Nombre (Z–A)', dirDefault: 'asc' },
   { criterio: 'visitas', label: 'Cantidad de visitas', dirDefault: 'desc' },
   { criterio: 'ultimaVisita', label: 'Última visita', dirDefault: 'desc' },
-  { criterio: 'fechaCreacion', label: 'Último cliente agregado', dirDefault: 'desc' },
+  { criterio: 'fechaCreacion', label: 'Último agregado', dirDefault: 'desc' },
 ]
 
-// Por defecto, la lista se ve ordenada alfabéticamente (A-Z) — antes no
-// tenía ningún orden explícito (el que viniera del backend).
-const ORDEN_POR_DEFECTO = { criterio: 'nombre', direccion: 'asc' }
+// Por defecto, la lista se ve con el último cliente agregado arriba.
+const ORDEN_POR_DEFECTO = { criterio: 'fechaCreacion', direccion: 'desc' }
 
 function compararClientes(a, b, orden) {
   const signo = orden.direccion === 'asc' ? 1 : -1
@@ -39,6 +35,18 @@ function compararClientes(a, b, orden) {
   }
 }
 
+// Texto del pie de la planilla: "ordenado por …".
+function describirOrden(orden) {
+  const op = OPCIONES_ORDEN.find((o) => o.criterio === orden.criterio)
+  if (!op) return ''
+  if (op.criterio === 'nombre') return orden.direccion === 'asc' ? 'nombre (A–Z)' : 'nombre (Z–A)'
+  const sentido = orden.direccion === 'asc' ? 'de menor a mayor' : 'de mayor a menor'
+  if (op.criterio === 'ultimaVisita' || op.criterio === 'fechaCreacion') {
+    return `${op.label.toLowerCase()} (${orden.direccion === 'asc' ? 'más antiguo primero' : 'más reciente primero'})`
+  }
+  return `${op.label.toLowerCase()} (${sentido})`
+}
+
 export default function Home() {
   const {
     goDetalleCliente,
@@ -50,87 +58,25 @@ export default function Home() {
   } = useApp()
   const [busqueda, setBusqueda] = useState('')
   // Filtra por si el cliente TUVO ALGUNA VEZ una visita de ese tipo —
-  // "tiposAplicados" es un texto separado por comas con todos los tipos
-  // distintos de su historial, recalculado solo en el backend cada vez que
-  // se crea/edita/borra una visita (ver recalcularAgregadosDeCliente_ en
-  // Code.gs) — así el filtro no tiene que leer el historial completo de
-  // visitas en cada carga de Home, solo lo que ya viene en la fila del
-  // cliente. '' = sin filtro (todos).
+  // "tiposAplicados" viene ya calculado en la fila del cliente (ver
+  // recalcularAgregadosDeCliente_ en Code.gs). '' = sin filtro (todos).
   const [filtroTipo, setFiltroTipo] = useState('')
-  const [filtroAbierto, setFiltroAbierto] = useState(false)
-  const filtroRef = useRef(null)
-
-  // Siempre hay un criterio activo (arranca en ORDEN_POR_DEFECTO, A-Z) —
-  // ya no existe un estado "sin ordenar".
   const [orden, setOrden] = useState(ORDEN_POR_DEFECTO)
-  const [ordenAbierto, setOrdenAbierto] = useState(false)
-  const ordenRef = useRef(null)
-  // El botón solo se ve "activo" (fondo oscuro) cuando el orden difiere
-  // del de por defecto — evita que se vea permanentemente resaltado sin
-  // que la usuaria haya tocado nada.
-  const ordenEsPorDefecto = orden.criterio === ORDEN_POR_DEFECTO.criterio && orden.direccion === ORDEN_POR_DEFECTO.direccion
 
-  // Cierra al hacer clic afuera o con Escape — mismo criterio que AppMenu.
-  useEffect(() => {
-    if (!filtroAbierto) return
-    const onClickFuera = (e) => {
-      if (filtroRef.current && !filtroRef.current.contains(e.target)) setFiltroAbierto(false)
-    }
-    const onKey = (e) => {
-      if (e.key === 'Escape') setFiltroAbierto(false)
-    }
-    document.addEventListener('mousedown', onClickFuera)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onClickFuera)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [filtroAbierto])
-
-  useEffect(() => {
-    if (!ordenAbierto) return
-    const onClickFuera = (e) => {
-      if (ordenRef.current && !ordenRef.current.contains(e.target)) setOrdenAbierto(false)
-    }
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOrdenAbierto(false)
-    }
-    document.addEventListener('mousedown', onClickFuera)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onClickFuera)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [ordenAbierto])
-
-  // La lista vive en AppContext (no acá) precisamente para que, al volver a
-  // Home, ya esté disponible al instante en vez de repetir el "Cargando…".
+  // La lista vive en AppContext (no acá) para que al volver a Home ya esté
+  // disponible al instante en vez de repetir el "Cargando…".
   const loading = !clientesLoaded && !clientesError
   const loadError = clientesLoaded ? null : clientesError
 
   const handleNuevo = () => openNuevoCliente()
 
-  // Clickear el tipo ya elegido lo desmarca (vuelve a "Todos") — mismo
-  // criterio que el checkbox de Amonio en VisitaModal.jsx, para poder
-  // corregir un tap sin tener que abrir de nuevo y elegir "Todos" aparte.
-  const handleElegirTipo = (tipo) => {
-    setFiltroTipo((actual) => (actual === tipo ? '' : tipo))
-    setFiltroAbierto(false)
+  const handleCriterio = (criterio) => {
+    const opcion = OPCIONES_ORDEN.find((o) => o.criterio === criterio)
+    setOrden({ criterio, direccion: opcion.dirDefault })
   }
 
-  // Elegir un criterio no seleccionado arranca en su dirección por defecto;
-  // volver a tocar el mismo criterio invierte la dirección (asc <-> desc)
-  // en vez de tener que elegir "ascendente/descendente" por separado.
-  const handleElegirOrden = (criterio) => {
-    setOrden((actual) => {
-      if (actual.criterio === criterio) {
-        return { criterio, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' }
-      }
-      const opcion = OPCIONES_ORDEN.find((o) => o.criterio === criterio)
-      return { criterio, direccion: opcion.dirDefault }
-    })
-    setOrdenAbierto(false)
-  }
+  const invertirDireccion = () =>
+    setOrden((actual) => ({ ...actual, direccion: actual.direccion === 'asc' ? 'desc' : 'asc' }))
 
   const clientesFiltrados = useMemo(() => {
     const q = normalizarTexto(busqueda.trim())
@@ -143,141 +89,120 @@ export default function Home() {
     return [...filtrados].sort((a, b) => compararClientes(a, b, orden))
   }, [clientes, busqueda, filtroTipo, orden])
 
+  const opcionOrden = OPCIONES_ORDEN.find((o) => o.criterio === orden.criterio)
+
   return (
     <>
-      {!loading && clientes.length > 0 && (
-        <div className="search-bar-row">
-          <div className="search-bar">
-            <Search size={16} className="search-bar__icon" />
-            <input
-              type="text"
-              className="search-bar__input"
-              placeholder="Buscar por nombre o teléfono…"
-              aria-label="Buscar clientes por nombre o teléfono"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-            {busqueda && (
-              <button
-                type="button"
-                className="search-bar__clear"
-                aria-label="Limpiar búsqueda"
-                onClick={() => setBusqueda('')}
-              >
-                <X size={14} strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
-
-          <div className="filtro-tipo" ref={filtroRef}>
+      {/* Barra: Buscar · Tipo · Ordenar · Nuevo cliente, en una sola fila
+          (se parte en 2-3 renglones recién en celular, ver .barra). */}
+      <div className="barra">
+        <label className="barra__celda barra__celda--buscar">
+          <Search size={17} strokeWidth={2.25} aria-hidden="true" />
+          <span className="barra__rotulo">Buscar:</span>
+          <input
+            type="search"
+            className="barra__campo"
+            placeholder="Buscar cliente"
+            aria-label="Buscar clientes por nombre o teléfono"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            disabled={loading}
+          />
+          {busqueda && (
             <button
               type="button"
-              className={`filtro-tipo__trigger ${filtroTipo ? 'filtro-tipo__trigger--activo' : ''}`}
-              aria-label={filtroTipo ? `Filtrando por ${filtroTipo}. Abrir filtro` : 'Filtrar por tipo de aplicación'}
-              aria-haspopup="true"
-              aria-expanded={filtroAbierto}
-              onClick={() => setFiltroAbierto((v) => !v)}
+              className="barra__limpiar"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setBusqueda('')}
             >
-              <Filter size={17} strokeWidth={2.25} />
+              <X size={16} strokeWidth={2.5} />
             </button>
+          )}
+        </label>
 
-            {filtroAbierto && (
-              <div className="filtro-tipo__dropdown" role="menu">
-                <button
-                  type="button"
-                  className={`filtro-tipo__item ${!filtroTipo ? 'filtro-tipo__item--activo' : ''}`}
-                  role="menuitemradio"
-                  aria-checked={!filtroTipo}
-                  onClick={() => {
-                    setFiltroTipo('')
-                    setFiltroAbierto(false)
-                  }}
-                >
-                  Todos
-                </button>
-                {TIPOS_APLICACION.map((tipo) => (
-                  <button
-                    key={tipo}
-                    type="button"
-                    className={`filtro-tipo__item ${filtroTipo === tipo ? 'filtro-tipo__item--activo' : ''}`}
-                    role="menuitemradio"
-                    aria-checked={filtroTipo === tipo}
-                    onClick={() => handleElegirTipo(tipo)}
-                  >
-                    {tipo}
-                  </button>
-                ))}
-              </div>
+        <label className="barra__celda barra__celda--tipo">
+          <span className="barra__rotulo">Tipo:</span>
+          <select
+            className="barra__campo"
+            aria-label="Filtrar por tipo de aplicación"
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            disabled={loading}
+          >
+            <option value="">Todos los tipos</option>
+            {TIPOS_APLICACION.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {tipo}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="barra__celda barra__celda--orden">
+          <label className="barra__rotulo" htmlFor="home-orden">
+            Ordenar:
+          </label>
+          <select
+            id="home-orden"
+            className="barra__campo"
+            aria-label="Ordenar clientes"
+            value={orden.criterio}
+            onChange={(e) => handleCriterio(e.target.value)}
+            disabled={loading}
+          >
+            {OPCIONES_ORDEN.map((op) => (
+              <option key={op.criterio} value={op.criterio}>
+                {op.criterio === orden.criterio && orden.direccion === 'desc' && op.labelDesc
+                  ? op.labelDesc
+                  : op.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="barra__dir"
+            onClick={invertirDireccion}
+            disabled={loading}
+            aria-label={`Invertir orden (${orden.direccion === 'asc' ? 'ascendente' : 'descendente'})`}
+            title={`${opcionOrden?.label}: invertir el orden`}
+          >
+            {orden.direccion === 'asc' ? (
+              <ArrowUp size={17} strokeWidth={2.25} />
+            ) : (
+              <ArrowDown size={17} strokeWidth={2.25} />
             )}
-          </div>
-
-          {/* Ordenar — control aparte del filtro de arriba a propósito: uno
-              recorta la lista, el otro solo la reordena. Mismo lenguaje
-              visual (círculo + desplegable), clases de .filtro-tipo
-              reusadas tal cual. */}
-          <div className="orden-clientes" ref={ordenRef}>
-            <button
-              type="button"
-              className={`filtro-tipo__trigger ${!ordenEsPorDefecto ? 'filtro-tipo__trigger--activo' : ''}`}
-              aria-label={`Ordenado por ${OPCIONES_ORDEN.find((o) => o.criterio === orden.criterio)?.label}. Abrir orden`}
-              aria-haspopup="true"
-              aria-expanded={ordenAbierto}
-              onClick={() => setOrdenAbierto((v) => !v)}
-            >
-              {ordenEsPorDefecto ? (
-                <ArrowUpDown size={17} strokeWidth={2.25} />
-              ) : orden.direccion === 'asc' ? (
-                <ArrowUp size={17} strokeWidth={2.25} />
-              ) : (
-                <ArrowDown size={17} strokeWidth={2.25} />
-              )}
-            </button>
-
-            {ordenAbierto && (
-              <div className="filtro-tipo__dropdown" role="menu">
-                {OPCIONES_ORDEN.map((op) => {
-                  const activo = orden.criterio === op.criterio
-                  return (
-                    <button
-                      key={op.criterio}
-                      type="button"
-                      className={`filtro-tipo__item ${activo ? 'filtro-tipo__item--activo' : ''}`}
-                      role="menuitemradio"
-                      aria-checked={activo}
-                      onClick={() => handleElegirOrden(op.criterio)}
-                    >
-                      {op.label}
-                      {activo && (
-                        <span className="filtro-tipo__item-flecha" aria-hidden="true">
-                          {orden.direccion === 'asc' ? (
-                            <ArrowUp size={13} strokeWidth={2.5} />
-                          ) : (
-                            <ArrowDown size={13} strokeWidth={2.5} />
-                          )}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          </button>
         </div>
-      )}
+
+        <Button variant="primary" className="barra__nuevo" onClick={handleNuevo}>
+          <Plus size={17} strokeWidth={2.5} aria-hidden="true" />
+          Nuevo cliente
+        </Button>
+      </div>
 
       {loading ? (
         <>
           <span className="sr-only" role="status">
             Cargando clientes…
           </span>
-          <div className="cliente-list" aria-hidden="true">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="skeleton-card">
-                <div className="skeleton skeleton--avatar" />
-                <div className="skeleton-card__lines">
-                  <div className="skeleton skeleton--line skeleton--line-lg" />
-                  <div className="skeleton skeleton--line skeleton--line-sm" />
-                </div>
+          <div className="planilla planilla--clientes" aria-hidden="true">
+            <CabeceraClientes />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="planilla__fila">
+                <span className="planilla__celda col-num" />
+                <span className="planilla__celda">
+                  <span className="skeleton skeleton--line skeleton--line-lg" />
+                </span>
+                <span className="planilla__celda col-tel">
+                  <span className="skeleton skeleton--line" />
+                </span>
+                <span className="planilla__celda">
+                  <span className="skeleton skeleton--line skeleton--line-sm" />
+                </span>
+                <span className="planilla__celda col-ultima">
+                  <span className="skeleton skeleton--line" />
+                </span>
+                <span className="planilla__celda" />
               </div>
             ))}
           </div>
@@ -295,7 +220,8 @@ export default function Home() {
           <div className="empty__emoji">💇‍♀️</div>
           <p>Todavía no hay clientes.</p>
           <Button variant="primary" onClick={handleNuevo}>
-            + Agregar el primero
+            <Plus size={17} strokeWidth={2.5} aria-hidden="true" />
+            Agregar el primero
           </Button>
         </div>
       ) : clientesFiltrados.length === 0 ? (
@@ -312,16 +238,34 @@ export default function Home() {
           )}
         </div>
       ) : (
-        <div className="cliente-list">
-          {clientesFiltrados.map((cliente) => (
-            <ClienteCard key={cliente.id} cliente={cliente} onOpen={goDetalleCliente} />
+        <div className="planilla planilla--clientes">
+          <CabeceraClientes />
+          {clientesFiltrados.map((cliente, i) => (
+            <ClienteCard key={cliente.id} cliente={cliente} numero={i + 1} onOpen={goDetalleCliente} />
           ))}
+          <div className="planilla__pie">
+            <strong>
+              {clientesFiltrados.length} {clientesFiltrados.length === 1 ? 'cliente' : 'clientes'}
+              {clientesFiltrados.length !== clientes.length && ` de ${clientes.length}`} · ordenado por{' '}
+              {describirOrden(orden)}
+            </strong>
+            <span>Tocá un nombre para abrir su ficha</span>
+          </div>
         </div>
       )}
-
-      <Button variant="primary" className="fab btn--borde-gris" onClick={handleNuevo}>
-        + Nuevo cliente
-      </Button>
     </>
+  )
+}
+
+function CabeceraClientes() {
+  return (
+    <div className="planilla__fila planilla__fila--cabecera" aria-hidden="true">
+      <span className="planilla__celda col-num">N°</span>
+      <span className="planilla__celda">Nombre y apellido</span>
+      <span className="planilla__celda col-tel">Teléfono</span>
+      <span className="planilla__celda planilla__celda--centro">Visitas</span>
+      <span className="planilla__celda col-ultima">Última visita</span>
+      <span className="planilla__celda planilla__celda--centro">Chat</span>
+    </div>
   )
 }

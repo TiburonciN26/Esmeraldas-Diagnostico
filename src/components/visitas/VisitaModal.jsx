@@ -15,6 +15,8 @@ import {
   Banknote,
   FileText,
   Camera,
+  Check,
+  Copy,
 } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useConfirm } from '../../context/ConfirmContext'
@@ -29,6 +31,7 @@ import {
   TIPO_TRES_MODOS,
 } from '../../data/constants'
 import { hoyISO } from '../../utils/date'
+import { fmtFecha } from '../../utils/format'
 import { calcularVisibilidad } from '../../utils/visitaLogic'
 import { comprimirImagen } from '../../utils/image'
 import Modal from '../ui/Modal'
@@ -433,6 +436,7 @@ export default function VisitaModal() {
     <Modal
       open={open}
       arriba
+      kicker="Registro de visita"
       title={esEdicion ? 'Editar visita' : 'Nueva visita'}
       subtitle={
         nombreCliente ? (
@@ -454,7 +458,8 @@ export default function VisitaModal() {
             onClick={handleGuardar}
             disabled={saving}
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+            {saving ? 'Guardando…' : 'Guardar visita'}
           </Button>
         </>
       }
@@ -465,10 +470,23 @@ export default function VisitaModal() {
         </div>
       )}
 
+      {/* Aviso de precarga: una visita nueva con historial arranca con los
+          datos de la última (ver CAMPOS_PRECARGA). */}
+      {!esEdicion && visita && (
+        <div className="aviso-copia">
+          <Copy size={16} strokeWidth={2.25} aria-hidden="true" />
+          <span>
+            Copiado de la visita del <strong>{fmtFecha(visita.fecha)}</strong>. Revisá y cambiá lo que haga falta;
+            fecha, nota y foto arrancan vacías.
+          </span>
+        </div>
+      )}
+
       {/* Sección 1: datos generales de la visita. Sin título — el acento
           de color arriba de la tarjeta (ver .visita-seccion--parametros)
           es lo único que la separa de las otras 2. */}
       <div className="visita-seccion visita-seccion--parametros">
+        <h3 className="seccion__titulo">1. Datos de la visita</h3>
         {/* Todos los <select> obligatorios de acá abajo llevan placeholder
             ("Elegir…"): un <select> sin opción vacía siempre muestra la
             primera opción como si ya estuviera elegida — si el usuario la
@@ -555,28 +573,30 @@ export default function VisitaModal() {
 
         {/* Condicional: decoloración - etapa */}
         {vis.decoloracion && (
-          <Field
-            icon={<Sparkles size={14} strokeWidth={2.25} />}
-            label="Decoloración — etapa"
-            required
-            error={errors.decoloracionEtapa}
-            htmlFor="v-decol"
-          >
-            <div className="field--cond">
+          <div className="fila-condicional field--cond">
+            <Field
+              icon={<Sparkles size={14} strokeWidth={2.25} />}
+              label="Decoloración — etapa"
+              required
+              error={errors.decoloracionEtapa}
+              htmlFor="v-decol"
+              hint="Solo para Rayitos, Balayage, Mechas e Iluminación"
+            >
               <TextInput
                 id="v-decol"
                 value={form.decoloracionEtapa}
                 error={errors.decoloracionEtapa}
                 onChange={(e) => set('decoloracionEtapa', e.target.value)}
               />
-            </div>
-          </Field>
+            </Field>
+          </div>
         )}
       </div>
 
       {/* Sección 2: fórmulas + oxígeno + tiempo. Sin título, mismo criterio
           que la sección 1. */}
       <div className="visita-seccion visita-seccion--formulas">
+        <h3 className="seccion__titulo">{mostrarMediosAparte ? '2. Fórmulas' : '2. Fórmula'}</h3>
         {/* Fórmula + oxígeno + tiempo principal — raíz salvo "Medio a punta"
             (usa medios a puntas directo) o "fórmula única" (label cambia,
             campos siguen siendo los de raíz). Los 3 en una fila y siempre
@@ -758,6 +778,9 @@ export default function VisitaModal() {
       {/* Sección 3: resultado, notas y cobro. Sin título, mismo criterio
           que las secciones 1 y 2. */}
       <div className="visita-seccion visita-seccion--resultado">
+        <h3 className="seccion__titulo">3. Resultado</h3>
+        <div className="resultado-grid">
+        <div className="resultado-grid__datos">
         <div className="form-row">
           <Field
             icon={<Palette size={14} strokeWidth={2.25} />}
@@ -796,8 +819,15 @@ export default function VisitaModal() {
         </div>
 
         <Field icon={<FileText size={14} strokeWidth={2.25} />} label="Nota" htmlFor="v-nota">
-          <TextArea id="v-nota" value={form.nota} onChange={(e) => set('nota', e.target.value)} />
+          <TextArea
+            id="v-nota"
+            rows={4}
+            placeholder="Algo para recordar la próxima vez…"
+            value={form.nota}
+            onChange={(e) => set('nota', e.target.value)}
+          />
         </Field>
+        </div>
 
         <Field
           icon={<Camera size={14} strokeWidth={2.25} />}
@@ -805,43 +835,43 @@ export default function VisitaModal() {
           htmlFor="v-foto"
           error={errorFoto}
         >
-        {/* Input real oculto (.sr-only, no display:none: sigue en el tab
-            order) — el botón visible es el <label> de abajo, así se puede
-            controlar el texto ("Tomar foto" en celular/tablet), cosa que
-            el botón nativo del input no permite (su texto lo pone el
-            navegador y no se puede cambiar por CSS).
-            capture="environment" salta directo a la cámara trasera en
-            celular en vez de mostrar primero el selector "Cámara / Galería
-            / Archivos"; en desktop el navegador lo ignora y cae al
-            selector de archivos de siempre. */}
-        <input
-          type="file"
-          id="v-foto"
-          accept="image/*"
-          capture="environment"
-          className="foto-input sr-only"
-          onChange={handleFoto}
-        />
-        <label htmlFor="v-foto" className="foto-boton">
-          <span className="foto-boton__texto foto-boton__texto--movil">Tomar foto</span>
-          <span className="foto-boton__texto foto-boton__texto--desktop">Seleccionar archivo</span>
-        </label>
-        {form.fotoResultado && (
-          <div className="foto-preview">
-            <img className="foto-preview__img" src={form.fotoResultado} alt="Resultado" />
-            <div>
-              <Button
-                variant="danger"
-                size="sm"
-                className="foto-preview__quitar"
-                onClick={() => set('fotoResultado', '')}
-              >
-                Quitar foto
-              </Button>
-            </div>
+          <div className="foto-zona">
+            {/* Input real oculto (.sr-only, no display:none: sigue en el
+                tab order) — el botón visible es el <label> de abajo, así
+                se puede controlar el texto ("Tomar foto" en celular/
+                tablet). capture="environment" salta directo a la cámara
+                trasera en celular; en desktop el navegador lo ignora. */}
+            <input
+              type="file"
+              id="v-foto"
+              accept="image/*"
+              capture="environment"
+              className="foto-input sr-only"
+              onChange={handleFoto}
+            />
+            {form.fotoResultado ? (
+              <div className="foto-preview">
+                <img className="foto-preview__img" src={form.fotoResultado} alt="Resultado" />
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <label htmlFor="v-foto" className="btn btn--ghost btn--sm">
+                    Cambiar foto
+                  </label>
+                  <Button variant="danger" size="sm" onClick={() => set('fotoResultado', '')}>
+                    Quitar foto
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <label htmlFor="v-foto" className="foto-boton">
+                <Camera size={28} strokeWidth={1.75} aria-hidden="true" />
+                <span className="foto-boton__texto foto-boton__texto--movil">Tomar foto</span>
+                <span className="foto-boton__texto foto-boton__texto--desktop">Seleccionar archivo</span>
+                <span className="field__hint">Opcional</span>
+              </label>
+            )}
           </div>
-        )}
         </Field>
+        </div>
       </div>
     </Modal>
   )

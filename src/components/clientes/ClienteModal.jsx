@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { User, Phone, Cake } from 'lucide-react'
+import { User, Phone, Cake, Check } from 'lucide-react'
 import { useApp } from '../../context/AppContext'
 import { useConfirm } from '../../context/ConfirmContext'
 import { useToast } from '../../context/ToastContext'
@@ -176,7 +176,9 @@ export default function ClienteModal() {
   return (
     <Modal
       open={open}
+      ancho="md"
       title={esEdicion ? 'Editar cliente' : 'Nuevo cliente'}
+      subtitle={esEdicion ? undefined : 'Alta en el cuaderno de clientes'}
       onClose={cerrarConGuardia}
       footer={
         <>
@@ -189,7 +191,8 @@ export default function ClienteModal() {
             onClick={handleGuardar}
             disabled={saving || loading}
           >
-            {saving ? 'Guardando…' : 'Guardar'}
+            <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+            {saving ? 'Guardando…' : 'Guardar cliente'}
           </Button>
         </>
       }
@@ -212,8 +215,9 @@ export default function ClienteModal() {
             </div>
           )}
 
-          {/* Sección 1: datos del cliente (sin título — a pedido) */}
-          <div className="card">
+          {/* Sección 1: datos del cliente */}
+          <div className="form-seccion">
+            <h3 className="seccion__titulo">1. Datos del cliente</h3>
             <Field
               icon={<User size={14} strokeWidth={2.25} />}
               label="Nombre completo"
@@ -247,8 +251,9 @@ export default function ClienteModal() {
               </Field>
 
               <Field
-                icon={<Cake size={14} strokeWidth={2.25} color="var(--color-amarillo-brillante)" />}
+                icon={<Cake size={14} strokeWidth={2.25} className="icono-cumple" />}
                 label="Cumpleaños (día y mes)"
+                hint="Sin año: solo sirve para avisar el día del cumple."
               >
                 {/* Sin año a propósito — no se pregunta el año de
                     nacimiento, solo día y mes (lo único que necesita el
@@ -279,27 +284,27 @@ export default function ClienteModal() {
           </div>
 
           {/* Sección 2: diagnóstico */}
-          <div className="card">
-            <h3 className="form-section-label">Diagnóstico</h3>
+          <div className="form-seccion">
+            <h3 className="seccion__titulo">2. Diagnóstico</h3>
 
             <div className="form-row">
               <Field label="Canas resistentes">
-                <div>
-                  <Segmented
-                    name="Canas resistentes"
-                    options={SI_NO}
-                    value={form.canasResistentes}
-                    onChange={(v) => set('canasResistentes', v)}
-                  />
-                </div>
+                <Segmented
+                  name="Canas resistentes"
+                  options={SI_NO}
+                  value={form.canasResistentes}
+                  onChange={(v) => set('canasResistentes', v)}
+                />
               </Field>
 
-              <Field label="Grosor del cabello" htmlFor="f-grosor">
-                <Select
-                  id="f-grosor"
+              {/* Casillas (antes era un desplegable): se elige con un solo
+                  toque y se ve igual que en la ficha del cliente. */}
+              <Field label="Grosor del cabello">
+                <Segmented
+                  name="Grosor del cabello"
                   options={GROSOR_CABELLO}
                   value={form.grosorCabello}
-                  onChange={(e) => set('grosorCabello', e.target.value)}
+                  onChange={(v) => set('grosorCabello', v)}
                 />
               </Field>
             </div>

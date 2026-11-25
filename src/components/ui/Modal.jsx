@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { X } from 'lucide-react'
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -17,13 +18,8 @@ const EXIT_MS = 180
 //   el padre lo desmonte de golpe apenas cambia su estado — por eso los
 //   componentes que lo usan pasan open={open} y SIEMPRE renderizan
 //   <Modal>, sin envolverlo en "{open && <Modal>...}".
-// - headerIcon/subtitle/headerOscuro son opcionales — sin ellos el header
-//   se ve exactamente igual que siempre (solo título + botón cerrar), así
-//   que no afectan a ningún otro modal de la app que no los pase.
-//   headerIcon (ícono + fondo oscuro) lo usa VisitaModal.jsx; headerOscuro
-//   (mismo fondo oscuro, sin el cuadrito de ícono) lo usa
-//   VisitaDetalleModal.jsx — cualquiera de los dos alcanza para pintar el
-//   header oscuro.
+// - kicker/subtitle son opcionales: el rótulo de arriba a la izquierda
+//   (por defecto el nombre del salón) y una línea extra debajo de él.
 // - arriba (opcional, alternativa a "centered"): en vez de centrarlo
 //   verticalmente, lo pega cerca del borde superior y lo ensancha — hoy
 //   lo usan VisitaModal.jsx y VisitaDetalleModal.jsx (mismo ancho para que
@@ -36,14 +32,14 @@ export default function Modal({
   open,
   title,
   subtitle,
-  headerIcon,
-  headerOscuro,
   closeExtra,
   onClose,
   children,
   footer,
   centered,
   arriba,
+  ancho,
+  kicker = 'Esmeraldas Salón & Spa',
 }) {
   const [rendered, setRendered] = useState(open)
   const [closing, setClosing] = useState(false)
@@ -125,37 +121,43 @@ export default function Modal({
 
   if (!rendered) return null
 
+  // Ancho: "lg" para los formularios/lecturas largos (visitas), "sm" para
+  // avisos/confirmaciones, "md" (default) para el resto.
+  const anchoFinal = ancho || (arriba ? 'lg' : 'md')
+
   return (
     <div
       className={`modal-overlay ${centered ? 'modal-overlay--centered' : ''} ${
-        arriba ? 'modal-overlay--arriba' : ''
-      } ${closing ? 'modal-overlay--closing' : ''}`}
+        closing ? 'modal-overlay--closing' : ''
+      }`}
       onMouseDown={onClose}
     >
       <div
         ref={modalRef}
-        className={`modal ${centered ? 'modal--centered' : ''} ${arriba ? 'modal--arriba' : ''} ${
-          closing ? 'modal--closing' : ''
-        }`}
+        className={`modal modal--${anchoFinal} ${closing ? 'modal--closing' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className={`modal__header ${headerIcon || headerOscuro ? 'modal__header--oscuro' : ''}`}>
-          {headerIcon && <div className="modal__header-icon">{headerIcon}</div>}
+        {/* Encabezado estilo hoja: rótulo + subtítulo a la izquierda,
+            título grande en mayúsculas + cerrar a la derecha. */}
+        <div className="modal__header">
           <div className="modal__header-text">
+            <span className="modal__kicker">{kicker}</span>
+            {subtitle && <div className="modal__subtitle">{subtitle}</div>}
+          </div>
+          <div className="modal__header-derecha">
             <h2 className="modal__title" id={titleId}>
               {title}
             </h2>
-            {subtitle && <div className="modal__subtitle">{subtitle}</div>}
-          </div>
-          <div className="modal__close-area">
-            <button className="modal__close" onClick={onClose} aria-label="Cerrar">
-              ×
-            </button>
-            {closeExtra && <div className="modal__close-extra">{closeExtra}</div>}
+            <div className="modal__close-area">
+              <button type="button" className="modal__close" onClick={onClose} aria-label="Cerrar">
+                <X size={20} strokeWidth={2.25} aria-hidden="true" />
+              </button>
+              {closeExtra && <div className="modal__close-extra">{closeExtra}</div>}
+            </div>
           </div>
         </div>
 
